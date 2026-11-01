@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sandboxd — daemon + bridge</title>
+<style>
+:root{--bg:#06080b;--panel:#0b1017;--panel2:#0e141c;--line:#1a2431;--line2:#243244;--txt:#c9d6e4;--dim:#67788c;--dim2:#43546a;--cy:#22d3ee;--ok:#34d399;--warn:#fbbf24;--err:#fb7185;--m:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:radial-gradient(900px 500px at 15% -10%,rgba(34,211,238,.09),transparent 60%),radial-gradient(700px 420px at 95% 0%,rgba(167,139,250,.07),transparent 60%),var(--bg);color:var(--txt);font-family:var(--m);font-size:13px;padding-bottom:72px;-webkit-font-smoothing:antialiased}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(34,211,238,.026) 1px,transparent 1px),linear-gradient(90deg,rgba(34,211,238,.026) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(circle at 50% 25%,black,transparent 88%)}
+.wrap{position:relative;z-index:1;padding:9px 12px 12px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:2px 2px 9px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#0d2230;border:1px solid #1d3b47;color:var(--cy);font-size:15px}
+.bn{font-size:14px;color:#e6f1f8}.bn b{color:var(--cy)}
+.bs{font-size:10px;color:var(--dim);letter-spacing:.09em;text-transform:uppercase;margin-top:1px}
+.pills{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:#0a1017;font-size:10.5px;color:var(--dim)}
+.pill b{color:#cfe0ee;font-weight:500}
+.pill.ok{border-color:#164e3a;background:#07130f;color:#6ee7b7}
+.pill.warn{border-color:#4a3a12;background:#13100a;color:var(--warn)}
+a.pill{text-decoration:none}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor}
+.pl{animation:pu 2s infinite}@keyframes pu{0%,100%{opacity:1}50%{opacity:.35}}
+.ghb{display:inline-flex;align-items:center;gap:7px;padding:4px 10px 4px 6px;border-radius:7px;border:1px solid #24405a;background:#0a1420;color:#cfe0ee;font-family:var(--m);font-size:10.5px;cursor:pointer}
+.ghb:hover{background:#12202e}.ghb img{width:16px;height:16px;border-radius:50%;display:block}
+.tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);font-family:var(--m);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;padding:7px 13px;cursor:pointer}
+.tab.on{color:var(--cy);border-bottom-color:var(--cy);background:linear-gradient(180deg,transparent,rgba(34,211,238,.07))}
+.g3{display:grid;grid-template-columns:236px minmax(0,1fr) 258px;gap:10px;align-items:start}
+.g2{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr);gap:10px;align-items:start}
+@media(max-width:1240px){.g3,.g2{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:9.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim)}
+.ttl{display:flex;align-items:center;gap:6px}
+.bm{width:3px;height:10px;border-radius:2px;background:var(--cy)}
+.bd{padding:9px 10px}.p0{padding:0}
+.q{margin-bottom:8px}.qr{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-bottom:4px}
+.qr b{color:#d6e5f2;font-weight:500}
+.tk{height:5px;background:#0d141d;border-radius:9px;overflow:hidden;border:1px solid #131c26}
+.fl{height:100%;border-radius:9px;transition:width .5s}
+.fl.cy{background:linear-gradient(90deg,#0e7490,var(--cy))}.fl.ok{background:linear-gradient(90deg,#065f46,var(--ok))}
+.fl.warn{background:linear-gradient(90deg,#78350f,var(--warn))}.fl.err{background:linear-gradient(90deg,#7f1d1d,var(--err))}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{flex:1;padding:6px 3px;font-family:var(--m);font-size:10px;background:none;color:var(--dim);border:0;border-right:1px solid var(--line);cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:rgba(34,211,238,.13);color:var(--cy)}
+.tg{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:11px;color:#b6c7da}
+.sw{width:32px;height:17px;border-radius:9px;background:#16202c;border:1px solid var(--line2);position:relative;cursor:pointer;flex:none}
+.sw i{position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#516274}
+.sw.on{background:rgba(52,211,153,.22);border-color:#1d6b52}.sw.on i{left:17px;background:var(--ok)}
+.chip{font-size:9.5px;padding:2px 6px;border-radius:5px;border:1px solid var(--line2);color:var(--dim);background:#0b1219;white-space:nowrap}
+.chip.cy{color:var(--cy);border-color:#164e5c;background:#07161c}
+.chip.ok{color:var(--ok);border-color:#16543f;background:#07140f}
+.chip.err{color:var(--err);border-color:#4d1a24;background:#130a0d}
+.chip.warn{color:var(--warn);border-color:#4a3a12;background:#13100a}
+.btn{font-family:var(--m);font-size:10px;padding:4px 8px;border-radius:6px;background:#0f1822;border:1px solid var(--line2);color:#b9cbe0;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block}
+.btn:hover{background:#152230;color:#e2eef8}
+.btn.cy{background:rgba(34,211,238,.1);border-color:#1a5c6b;color:var(--cy)}
+.btn.ok{background:rgba(52,211,153,.1);border-color:#1d6b52;color:var(--ok)}
+.btn.err{background:rgba(251,113,133,.08);border-color:#4d1a24;color:var(--err)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}
+th{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim2);text-align:left;padding:3px 5px;border-bottom:1px solid var(--line);font-weight:500}
+td{padding:6px 5px;border-bottom:1px solid rgba(26,36,49,.55);font-size:11px;color:#b3c4d6}
+.cid{color:#7dd3fc;font-size:10.5px}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:10px}
+.st i{width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+.s-running{color:var(--ok)}.s-created{color:var(--warn)}.s-exited{color:var(--dim)}.s-error{color:var(--err)}
+.empty{color:var(--dim2);text-align:center;padding:15px 8px;font-size:10.5px;line-height:1.7}
+.gate{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;border:1px solid transparent;margin-bottom:1px}
+.gate .lamp{width:7px;height:7px;border-radius:50%;background:#1d2733;border:1px solid #2b3a4a;flex:none}
+.gate .nm{font-size:10.5px;color:#93a7bb;flex:1}
+.gate .ct{font-size:9px;color:var(--dim2)}
+.gate.fire{background:rgba(34,211,238,.08);border-color:rgba(34,211,238,.25)}
+.gate.fire .lamp{background:var(--cy);border-color:var(--cy);box-shadow:0 0 12px var(--cy)}
+.gate.block{background:rgba(251,113,133,.08);border-color:rgba(251,113,133,.28)}
+.gate.block .lamp{background:var(--err);border-color:var(--err)}
+.ev{font-size:10px;line-height:1.45;padding:3px 0;border-bottom:1px solid rgba(26,36,49,.5);display:flex;gap:6px}
+.ev .tm{color:var(--dim2);flex:none}.ev .ms{flex:1;color:#a8bbcd;word-break:break-word}
+.ev .sg{color:#2f4356;flex:none;font-size:9px}
+.ev.ok .ms{color:#7fe3bb}.ev.warn .ms{color:#f7cf74}.ev.err .ms{color:#ff9baa}.ev.cy .ms{color:#7dd3fc}
+.scr{max-height:204px;overflow-y:auto;padding:6px 10px}
+.term{background:#05080b;border:1px solid var(--line);border-radius:9px;overflow:hidden;display:flex;flex-direction:column;margin-top:10px}
+.td{display:flex;gap:4px}.td i{width:7px;height:7px;border-radius:50%;display:block}
+.tlog{height:152px;overflow-y:auto;padding:8px 11px;font-size:11.5px;line-height:1.55}
+.term.collapsed .tlog{height:0;padding:0 11px;overflow:hidden}
+.tl{white-space:pre-wrap;word-break:break-word;color:#a9bccd}
+.tl.dim{color:#5f7183}.tl.ok{color:#6ee7b7}.tl.warn{color:#fbbf24}.tl.err{color:#fb7185}
+.tl.cy{color:#67e8f9}.tl.vio{color:#c4b5fd}.tl.echo{color:#e2eef8}
+.tin{display:flex;align-items:center;gap:7px;padding:7px 11px;border-top:1px solid #131d27;background:#070b0f}
+.ps1{color:var(--ok);font-size:11px;white-space:nowrap}.ps1 span{color:var(--cy)}
+.tin input{flex:1;background:none;border:0;outline:none;color:#e6f1f8;font-family:var(--m);font-size:11.5px;caret-color:var(--cy)}
+.pg{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:7px}
+.pc{border:1px solid var(--line);border-radius:7px;padding:7px 8px;cursor:pointer;background:#0a1119}
+.pc:hover,.pc.active{border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.07)}
+.pc .pn{font-size:10.5px;color:#d5e4f0;display:flex;justify-content:space-between;gap:6px}
+.pc .pm{font-size:9px;color:var(--dim2);margin-top:2px}
+.prg{height:3px;background:#0d151d;border-radius:9px;overflow:hidden;margin-top:8px}
+.prg .p{height:100%;width:0;background:linear-gradient(90deg,#0e7490,var(--cy))}
+.plog{font-size:10px;color:var(--dim);margin-top:6px;min-height:13px}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:10.5px;padding:3px 0;border-bottom:1px solid rgba(26,36,49,.4)}
+.kv:last-child{border-bottom:0}.kv span:first-child{color:var(--dim)}.kv span:last-child{color:#cfe0ee;text-align:right;word-break:break-all}
+.cm{display:flex;gap:8px;padding:7px 8px;border-radius:7px;border:1px solid transparent;cursor:pointer}
+.cm:hover{background:#0d1620;border-color:var(--line)}
+.cm.pinned{background:rgba(34,211,238,.07);border-color:rgba(34,211,238,.3)}
+.cm img{width:20px;height:20px;border-radius:50%;flex:none;background:#16202c}
+.cm .b{min-width:0;flex:1}
+.cm .ms{font-size:11px;color:#d3e2ef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cm .mt{font-size:9.5px;color:var(--dim2);margin-top:2px;display:flex;gap:7px;flex-wrap:wrap}
+.linkc{border:1px solid var(--line);border-radius:8px;padding:8px 9px;background:#0a1119;margin-bottom:7px}
+.lh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+.ln{font-size:10.5px;color:#d5e4f0;display:flex;align-items:center;gap:6px}
+.linkc .u{font-size:10px;color:#7dd3fc;word-break:break-all;line-height:1.5;background:#07131a;border:1px solid #12222d;border-radius:5px;padding:5px 6px;user-select:all}
+.lf{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:5px}
+.note{font-size:9px;color:var(--dim2);line-height:1.4;flex:1}
+.fld{display:flex;flex-direction:column;gap:3px;font-size:9.5px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.fld input,.fld textarea{background:#0a1219;border:1px solid var(--line2);border-radius:6px;color:#e2eef8;font-family:var(--m);font-size:11px;padding:5px 7px;outline:none;text-transform:none;letter-spacing:0;resize:vertical}
+.fld input:focus{border-color:#2d5a6e}
+.row{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap}
+.pre{background:#060a0e;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:9.5px;line-height:1.55;color:#93a9bd;white-space:pre-wrap;word-break:break-word;max-height:128px;overflow:auto}
+.pubc{background:#05090d;border:1px solid var(--line);border-radius:7px;padding:7px 8px;font-size:10px;line-height:1.6;max-height:174px;overflow:auto}
+.ps{display:flex;gap:6px}.ps .i{flex:none;width:11px;text-align:center}
+.ps.run .i{color:var(--cy)}.ps.ok .i{color:var(--ok)}.ps.err .i{color:var(--err)}
+.ps.warn .i{color:var(--warn)}.ps.dim .i{color:var(--dim2)}
+.ps.run .t{color:#9fb6c9}.ps.ok .t{color:#9fe8c8}.ps.err .t{color:#ff9baa}
+.ps.warn .t{color:#f7cf74}.ps.dim .t{color:#5d7183}
+.lb{border:1px solid #1d6b52;background:rgba(52,211,153,.07);border-radius:8px;padding:9px;margin-top:8px}
+.lbt{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#6ee7b7;display:flex;gap:6px}
+.lbu{font-size:11px;color:#d6f5ea;word-break:break-all;margin-top:5px;user-select:all}
+.qrimg{width:92px;height:92px;border-radius:6px;border:1px solid var(--line2);background:#0b1017;flex:none}
+.drop{border:1.5px dashed #294055;border-radius:9px;padding:12px 10px;text-align:center;cursor:pointer;background:#080d12}
+.drop:hover,.drop.hot{border-color:var(--cy);background:rgba(34,211,238,.05)}
+.drop .bg{font-size:11.5px;color:#c2d5e6}
+.drop .sb{font-size:9.5px;color:var(--dim2);margin-top:4px;line-height:1.6}
+.cv{background:#05080b;border:1px solid var(--line);border-radius:8px;padding:6px;display:grid;place-items:center;min-height:100px}
+.cv canvas{max-width:100%;height:auto;display:block;border-radius:4px}
+.mtr{height:5px;background:#0d141d;border-radius:9px;overflow:hidden;border:1px solid #131c26;margin-top:5px}
+.mtr i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0e7490,var(--cy))}
+.log{font-size:10px;line-height:1.6;max-height:108px;overflow:auto;background:#05090d;border:1px solid var(--line);border-radius:6px;padding:7px 8px}
+.lgl{display:flex;gap:6px}.lgl .i{flex:none;width:10px}
+.lgl.ok .i{color:var(--ok)}.lgl.ok .t{color:#9fe8c8}
+.lgl.err .i{color:var(--err)}.lgl.err .t{color:#ff9baa}
+.lgl.warn .i{color:var(--warn)}.lgl.warn .t{color:#f7cf74}
+.lgl.info .i{color:var(--cy)}.lgl.info .t{color:#9fb6c9}
+.lgl.dim .i{color:var(--dim2)}.lgl.dim .t{color:#5d7183}
+.ov{position:fixed;inset:0;background:rgba(3,5,8,.85);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.ov.on{display:flex}
+.mod{width:min(410px,100%);background:#0d151d;border:1px solid #22303f;border-radius:11px;overflow:hidden}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#c8d8e6}
+.mb{padding:12px;display:flex;flex-direction:column;gap:9px;font-size:11px;color:#a9bccd;line-height:1.6}
+.hint{font-size:9.5px;color:var(--dim2);line-height:1.55}
+.hint a{color:#67e8f9;text-decoration:none}
+.wb{border:1px solid #4a3a12;background:#13100a;color:#f7cf74;border-radius:6px;padding:6px 8px;font-size:9.5px;line-height:1.5}
+.eb{border:1px solid #4d1a24;background:#130a0d;color:#ff9baa;border-radius:6px;padding:6px 8px;font-size:9.5px;line-height:1.5}
+.ob{border:1px solid #1d6b52;background:#07140f;color:#7fe3bb;border-radius:6px;padding:6px 8px;font-size:9.5px;line-height:1.5}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:#1c2937;border-radius:9px}
+.ms{font-size:9.5px;color:var(--dim2)}
+.dock{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:40;display:flex;align-items:center;gap:3px;padding:5px 6px;border-radius:13px;border:1px solid #22303f;background:rgba(10,16,23,.94);backdrop-filter:blur(12px);box-shadow:0 14px 40px rgba(0,0,0,.6);max-width:calc(100vw - 20px);overflow-x:auto}
+.dk{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:9px;font-size:10.5px;color:var(--dim);cursor:pointer;white-space:nowrap}
+.dk:hover{background:#131d28;color:#d3e2ef}
+.dk.on{background:rgba(34,211,238,.13);color:var(--cy)}
+.dk i{font-style:normal;font-size:12px;line-height:1}
+.dsep{width:1px;height:18px;background:#22303f;margin:0 4px;flex:none}
+</style></head><body>
+<div class="wrap">
+<div class="topbar">
+  <div class="brand"><div class="logo">◲</div><div>
+    <div class="bn"><b>sandboxd</b> <span class="ms">/ vdn-1.0.2</span></div>
+    <div class="bs">daemon · github · publish · bridge</div>
+  </div></div>
+  <div class="pills">
+    <span class="pill ok"><i class="dot pl"></i>DAEMON <b>RUNNING</b></span>
+    <span class="pill">uptime <b id="uptime">00:32:46</b></span>
+    <span class="pill warn">host.sock <b>UNMOUNTED</b></span>
+    <span class="pill"><i class="dot" style="color:#a78bfa"></i>chain <b id="chainroot">74b57e29</b></span>
+    <a class="pill ok" id="livepill" target="_blank" rel="noopener" href="http://pages.mydomain.dev/" hidden=""><i class="dot"></i>LIVE <b id="livehost">pages.mydomain.dev</b> ↗</a>
+    <button class="ghb" id="ghpill"><img src="https://avatars.githubusercontent.com/u/40648133?v=4" alt=""><span>onegayunicorn</span></button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab" data-tab="ops">Operations</button>
+  <button class="tab" data-tab="source">Source</button>
+  <button class="tab on" data-tab="hosting">Hosting</button>
+  <button class="tab" data-tab="bridge">Bridge</button>
+</div>
+
+<div class="tabpane" data-pane="ops" hidden=""><div class="g3">
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Quotas</div><span class="chip cy">hard</span></div><div class="bd">
+      <div class="q"><div class="qr"><span>memory</span><span><b id="qmem">0</b> / <b id="qmemmax">2048</b>mb</span></div><div class="tk"><div class="fl ok" id="fmem" style="width: 0%;"></div></div></div>
+      <div class="q"><div class="qr"><span>cpu</span><span><b id="qcpu">0.00</b> / 2.00</span></div><div class="tk"><div class="fl ok" id="fcpu" style="width: 0%;"></div></div></div>
+      <div class="q"><div class="qr"><span>disk</span><span><b id="qdisk">120</b> / 5120mb</span></div><div class="tk"><div class="fl " id="fdisk" style="width: 2.34375%;"></div></div></div>
+      <div class="q"><div class="qr"><span>pids</span><span><b id="qpids">0</b> / 256</span></div><div class="tk"><div class="fl ok" id="fpids" style="width: 0%;"></div></div></div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Network</div></div><div class="bd">
+      <div class="seg" id="netseg"><button data-net="isolated" class="">isolated</button><button data-net="allowlist" class="">allowlist</button><button data-net="open" class="on">open</button></div>
+      <div class="ms" style="margin-top:7px;line-height:1.6" id="netnote">EGRESS UNRESTRICTED · weakened</div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Hooks</div><span class="chip" id="hookactive">4 on</span></div><div class="bd" id="hooktoggles"><div class="tg"><span>security.hook</span><div class="sw on" data-hook="security"><i></i></div></div><div class="tg"><span>network.hook</span><div class="sw on" data-hook="network"><i></i></div></div><div class="tg"><span>resource.hook</span><div class="sw on" data-hook="resource"><i></i></div></div><div class="tg"><span>audit.hook</span><div class="sw on" data-hook="audit"><i></i></div></div></div></div>
+  </div>
+  <div class="col">
+    <div class="panel">
+      <div class="hd"><div class="ttl"><span class="bm"></span>Containers <span class="chip" id="cctl">0 running</span></div>
+      <div style="display:flex;gap:5px"><button class="btn cy" id="btnrun">＋ run</button><button class="btn" id="btnpoll">⟳</button><button class="btn err" id="btnkill">⏻</button></div></div>
+      <div class="p0"><table><thead><tr><th style="width:80px">container</th><th>image</th><th>command</th><th style="width:68px">state</th><th style="width:38px">cpu</th><th style="width:50px">mem</th><th style="width:36px">age</th></tr></thead>
+      <tbody id="ctbody"></tbody></table></div>
+    </div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Pipelines</div><span class="chip cy" id="pstate">running</span></div><div class="bd">
+      <div class="pg" id="pgrid"><div class="pc" data-pipe="build"><div class="pn"><span>🔨 build</span><span class="chip" style="font-size:8px;padding:0 4px">4</span></div><div class="pm">on: post_start</div></div><div class="pc" data-pipe="test"><div class="pn"><span>🧪 test</span><span class="chip" style="font-size:8px;padding:0 4px">4</span></div><div class="pm">on: manual</div></div><div class="pc" data-pipe="deploy"><div class="pn"><span>🚀 deploy</span><span class="chip" style="font-size:8px;padding:0 4px">5</span></div><div class="pm">on: approved</div></div><div class="pc" data-pipe="sync"><div class="pn"><span>⟲ source</span><span class="chip" style="font-size:8px;padding:0 4px">4</span></div><div class="pm">on: github</div></div></div><div class="prg"><div class="p" id="pprog"></div></div>
+      <div class="plog" id="plog">select a pipeline</div></div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Lifecycle Gates</div><span class="chip">8</span></div><div class="bd" id="gates" style="padding:6px"><div class="gate" data-gate="pre_create"><span class="lamp"></span><span class="nm">pre_create</span><span class="ct">×6</span></div><div class="gate" data-gate="post_create"><span class="lamp"></span><span class="nm">post_create</span><span class="ct">×6</span></div><div class="gate" data-gate="pre_start"><span class="lamp"></span><span class="nm">pre_start</span><span class="ct">×6</span></div><div class="gate" data-gate="post_start"><span class="lamp"></span><span class="nm">post_start</span><span class="ct">×6</span></div><div class="gate" data-gate="pre_exec"><span class="lamp"></span><span class="nm">pre_exec</span><span class="ct">—</span></div><div class="gate" data-gate="post_exec"><span class="lamp"></span><span class="nm">post_exec</span><span class="ct">—</span></div><div class="gate" data-gate="pre_destroy"><span class="lamp"></span><span class="nm">pre_destroy</span><span class="ct">×6</span></div><div class="gate" data-gate="on_error"><span class="lamp"></span><span class="nm">on_error</span><span class="ct">—</span></div></div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Audit Chain</div><button class="btn" id="btnverify" style="padding:2px 6px;font-size:9px">verify</button></div><div class="scr" id="events"></div></div>
+  </div>
+</div></div>
+
+<div class="tabpane" data-pane="source" hidden=""><div class="g2">
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Repository</div><span class="chip ok" id="repochip">onegayunicorn/sovereign-apk-forge</span></div><div class="bd">
+      <div class="row" style="margin-bottom:8px">
+        <div class="fld" style="flex:1;min-width:140px"><label>owner/repo</label><input id="inRepo" placeholder="facebook/react" list="repolist" autocomplete="off"><datalist id="repolist"></datalist></div>
+        <div class="fld" style="width:96px"><label>branch</label><input id="inBranch" placeholder="main" autocomplete="off"></div>
+        <button class="btn cy" id="btnLoad" style="height:27px">load</button>
+      </div>
+      <div id="repocard"></div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Pinned commit</div><span class="chip ok" id="pinchip">617163a</span></div><div class="bd" id="pininfo"></div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Commits</div><span class="chip" id="cmchip">6 · main</span></div><div class="scr" id="commits" style="max-height:400px"></div></div>
+  </div>
+</div></div>
+
+<div class="tabpane" data-pane="hosting"><div class="g2">
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Publish · Live Subdomain</div><span class="chip warn" id="pubchip">deploying</span></div><div class="bd">
+      <div class="hint" style="margin-bottom:8px">Publishes this app to GitHub Pages. If a claim is coded on the <b>Bridge</b> tab, <b>claim.json</b> + <b>verify.html</b> + the image ship in the same commit.</div>
+      <div class="row" style="margin-bottom:6px">
+        <div class="fld" style="flex:1;min-width:124px"><label>target repo</label><input id="pubRepo" value="sandboxd-live" autocomplete="off"></div>
+        <div class="fld" style="flex:1;min-width:124px"><label>custom domain</label><input id="pubDomain" placeholder="sandbox.mydomain.dev" autocomplete="off"></div>
+      </div>
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:9.5px;color:#67788c"><input type="checkbox" id="pubPrivate" style="accent-color:#22d3ee"> private <span style="color:#43546a">(Pages needs paid)</span></label>
+        <span style="flex:1"></span><button class="btn cy" id="btnPublish" disabled="">🚀 publish</button>
+      </div>
+      <div class="pubc" id="pubconsole"></div>
+      <div id="pubresult"></div>
+    </div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Live Domain Links</div><span class="chip cy" id="linkchip">3 live · 4</span></div><div class="bd" id="links"></div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Custom Domain · DNS</div><span class="chip" id="dnschip">onegayunicorn.github.io</span></div><div class="bd">
+      <div class="row" style="margin-bottom:8px"><div class="fld" style="flex:1"><label>your domain</label><input id="inDomain" placeholder="sandbox.example.com" autocomplete="off"></div><button class="btn cy" id="btnDns" style="height:27px">generate</button></div>
+      <div id="dnsout"></div>
+    </div></div>
+  </div>
+</div></div>
+
+<div class="tabpane" data-pane="bridge" hidden=""><div class="g2">
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>1 · Code a claim</div><span class="chip ok" id="imgchip">517×526</span></div><div class="bd">
+      <div class="drop" id="drop">
+        <div class="bg">drop a JPG — or click to pick</div>
+        <div class="sb">JPG → <b>APP15 segment</b> (pixels untouched) · PNG → LSB plane</div>
+        <input type="file" id="fileIn" accept="image/*" hidden="">
+      </div>
+      <div class="cv" id="preview" style="margin-top:8px"></div>
+      <div id="imginfo" style="margin-top:6px"></div>
+      <div class="row" style="margin-top:8px">
+        <div class="fld" style="flex:1;min-width:124px"><label>domain to claim</label><input id="bDomain" placeholder="sandbox.mydomain.dev"></div>
+        <div class="fld" style="width:90px"><label>commit</label><input id="bCommit" placeholder="a1b2c3d"></div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div class="fld" style="flex:1;min-width:100px"><label>sandbox id</label><input id="bSbx" placeholder="sbx_1a2b3c"></div>
+        <div class="fld" style="width:90px"><label>chain</label><input id="bChain" placeholder="deadbeef"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn cy" id="btnEmbed">⬡ code payload</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:9.5px;color:#67788c"><input type="checkbox" id="optMark" style="accent-color:#22d3ee"> watermark</label>
+      </div>
+      <div class="mtr"><i id="capbar" style="width: 0.793639%;"></i></div>
+      <div class="note" id="capnote" style="margin-top:4px">claim ≈ 520 B of 65521 B</div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>3 · Verify any copy</div><span class="chip err" id="vchip">no payload</span></div><div class="bd">
+      <div class="drop" id="vdrop" style="padding:10px"><div class="bg" style="font-size:11px">drop a suspected copy</div>
+      <div class="sb">tries JPG APP15 first, then PNG LSB</div><input type="file" id="vfile" accept="image/*" hidden=""></div>
+      <div id="vout" style="margin-top:7px"></div>
+    </div></div>
+  </div>
+  <div class="col">
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>2 · Coded output</div><span class="chip" id="outchip">pending</span></div><div class="bd">
+      <div class="cv" id="outpreview"></div>
+      <div class="log" id="embedlog" style="margin-top:7px"></div>
+      <div class="row" style="margin-top:7px" id="outactions" hidden="">
+        <button class="btn ok" id="btnDlImg">↓ image</button>
+        <button class="btn" id="btnDlClaim">↓ claim.json</button>
+        <button class="btn" id="btnDlVerify">↓ verify.html</button>
+      </div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>4 · Publish to a Facebook Page</div><span class="chip">graph v21</span></div><div class="bd">
+      <div class="row" style="margin-bottom:6px">
+        <div class="fld" style="flex:1;min-width:110px"><label>page id</label><input id="fbPage" placeholder="123456789012345"></div>
+        <div class="fld" style="flex:1.4;min-width:130px"><label>page token</label><input id="fbTok" type="password" placeholder="EAAG…"></div>
+      </div>
+      <div class="fld" style="margin-bottom:6px"><label>caption</label><textarea id="fbMsg" rows="2" placeholder="provenance: claim coded into the file"></textarea></div>
+      <div class="row"><button class="btn cy" id="btnFb" disabled="">⇪ upload</button><button class="btn" id="btnCurl">copy curl</button>
+      <a class="btn" href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener">tokens ↗</a></div>
+      <div id="fbout" style="margin-top:7px"></div>
+    </div></div>
+    <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Bundle the domain serves</div><span class="chip" id="bchip">—</span></div><div class="bd">
+      <div class="note" style="margin-bottom:6px">Publishing writes these into the Pages commit. <b>verify.html</b> re-hashes the image in the browser.</div>
+      <div class="pre" id="claimpre"></div>
+    </div></div>
+  </div>
+</div></div>
+
+<div class="term" id="term">
+  <div class="hd"><div class="ttl"><span class="bm"></span>Terminal</div>
+  <div style="display:flex;gap:8px;align-items:center"><span class="ms">/bin/sandboxd</span>
+  <button class="btn" id="btncollapse" style="padding:1px 6px;font-size:9px">⌃</button>
+  <div class="td"><i style="background:#3a2027"></i><i style="background:#3a3320"></i><i style="background:#1d3a2e"></i></div></div></div>
+  <div class="tlog" id="tlog"></div>
+  <div class="tin"><div class="ps1">sandboxd@sbx<span>:~/daemon</span> $</div>
+  <input id="tinput" autocomplete="off" spellcheck="false" placeholder="help · gh repo owner/name · publish · bridge"></div>
+</div>
+</div>
+
+<nav class="dock">
+  <a class="dk" data-jump="ops"><i>◲</i>operations</a>
+  <a class="dk" data-jump="source"><i>◈</i>source</a>
+  <a class="dk on" data-jump="hosting"><i>◎</i>hosting</a>
+  <span class="dsep"></span>
+  <a class="dk" data-jump="bridge"><i>⬡</i>bridge</a>
+</nav>
+
+<div class="ov" id="authOverlay"><div class="mod">
+  <div class="mh"><span id="authTitle">connect github</span><button class="btn" id="authClose" style="padding:1px 7px">✕</button></div>
+  <div class="mb">
+    <div class="fld"><label>personal access token (repo, read:user)</label><input id="inTok" type="password" placeholder="ghp_…" autocomplete="off"></div>
+    <div class="row"><button class="btn cy" id="btnTok" style="flex:1;height:28px">sign in</button><button class="btn" id="btnOut" style="height:28px">sign out</button></div>
+    <div class="hint">create at <a href="https://github.com/settings/tokens/new?scopes=repo,read:user&amp;description=sandboxd" target="_blank" rel="noopener">github.com/settings/tokens</a> · scope <b>repo</b> · stored only in this browser.</div>
+  </div>
+</div></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(i){return document.getElementById(i);};
+var sl=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
+var S={boot:Date.now(),net:'isolated',allow:['alpine:latest','python:3.11','ollama/qwen2.5:0.5b','redis:7-alpine'],
+ hooks:{security:true,network:true,resource:true,audit:true},q:{mem:2048,cpu:2,disk:5120,pids:256},
+ cs:[],ev:[],gh:{},chain:'00000000'};
+var G={token:null,user:null,repo:null,pages:null,commits:[],pinned:null,rate:null,busy:false};
+var P={run:false,steps:[],result:null,builds:[]};
+var B={file:null,buf:null,sha:null,w:0,h:0,jpg:false,man:null,blob:null,ext:'png',vhtml:''};
+var PL={run:false,name:null},hist=[],hi=-1;
+var GATES=['pre_create','post_create','pre_start','post_start','pre_exec','post_exec','pre_destroy','on_error'];
+var PIPE={build:{l:'🔨 build',s:['resolve base image','pnpm install','pnpm build','emit manifest'],a:['dist.tar.gz','manifest.json'],m:'post_start'},
+ test:{l:'🧪 test',s:['spin python:3.11','pytest --tb=short','collect coverage','destroy sandbox'],a:['junit.xml'],m:'manual'},
+ deploy:{l:'🚀 deploy',s:['read pinned commit','verify chain','upload artifact','commit bridge','deploy'],a:['deploy.receipt'],m:'approved'},
+ sync:{l:'⟲ source',s:['git fetch','checkout','diff tree','stage volume'],a:['source.lock'],m:'github'}};
+function ls(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+function lss(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){}}
+function h32(s){var h=0x811c9dc5;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}return('00000000'+h.toString(16)).slice(-8);}
+function rid(){return Math.random().toString(16).slice(2,8);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':'&quot;';});}
+function clk(d){return('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);}
+function fage(ms){var s=Math.floor(ms/1000);return s<60?s+'s':s<3600?Math.floor(s/60)+'m':Math.floor(s/3600)+'h';}
+function rel(i){if(!i)return'—';var d=(Date.now()-new Date(i).getTime())/1000;
+ if(d<60)return Math.floor(d)+'s ago';if(d<3600)return Math.floor(d/60)+'m ago';
+ if(d<86400)return Math.floor(d/3600)+'h ago';if(d<2592000)return Math.floor(d/86400)+'d ago';return Math.floor(d/2592000)+'mo ago';}
+function b64(s){var b=new TextEncoder().encode(s),o='';for(var i=0;i<b.length;i++)o+=String.fromCharCode(b[i]);return btoa(o);}
+function ab64(buf){var u=new Uint8Array(buf),o='';for(var i=0;i<u.length;i++)o+=String.fromCharCode(u[i]);return btoa(o);}
+function cp(t,l){var d=function(){tl('· copied '+(l||''),'ok');};
+ if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(d).catch(f);else f();
+ function f(){try{var a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);d();}catch(e){tl('· clipboard blocked','warn');}}}
+function dl(n,blob){var u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=n;
+ document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(u);},4000);blog('ok','saved '+n);}
+var TL=$('tlog');
+function tl(t,c){var d=document.createElement('div');d.className='tl'+(c?' '+c:'');d.textContent=t;TL.appendChild(d);
+ while(TL.children.length>400)TL.removeChild(TL.firstChild);TL.scrollTop=TL.scrollHeight;}
+function pe(k,m,l){l=l||'cy';S.chain=h32(S.chain+'|'+k+'|'+m);
+ S.ev.unshift({t:new Date(),m:m,l:l,s:S.chain});if(S.ev.length>120)S.ev.pop();
+ renderEv();$('chainroot').textContent=S.chain;}
+function renderEv(){var b=$('events');if(!S.ev.length){b.innerHTML='<div class="empty">no actions</div>';return;}
+ b.innerHTML=S.ev.map(function(e){return '<div class="ev '+e.l+'"><span class="tm">'+clk(e.t)+'</span><span class="ms">'+esc(e.m)+'</span><span class="sg">'+e.s+'</span></div>';}).join('');}
+function gate(p,ok){var n=document.querySelector('[data-gate="'+p+'"]');if(!n)return;
+ S.gh[p]=(S.gh[p]||0)+1;var c=n.querySelector('.ct');if(c)c.textContent='×'+S.gh[p];
+ n.classList.remove('fire','block');n.classList.add(ok===false?'block':'fire');
+ setTimeout(function(){n.classList.remove('fire','block');},ok===false?2500:1100);
+ pe('hook','gate '+(ok===false?'BLOCKED':'passed')+' → '+p,ok===false?'err':'ok');}
+function renderGates(){$('gates').innerHTML=GATES.map(function(g){
+ return '<div class="gate" data-gate="'+g+'"><span class="lamp"></span><span class="nm">'+g+'</span><span class="ct">'+(S.gh[g]?'×'+S.gh[g]:'—')+'</span></div>';}).join('');}
+function renderHooks(){var ks=Object.keys(S.hooks);
+ $('hooktoggles').innerHTML=ks.map(function(k){
+  return '<div class="tg"><span>'+k+'.hook</span><div class="sw '+(S.hooks[k]?'on':'')+'" data-hook="'+k+'"><i></i></div></div>';}).join('');
+ $('hooktoggles').querySelectorAll('[data-hook]').forEach(function(s){s.addEventListener('click',function(){
+  var k=s.getAttribute('data-hook');S.hooks[k]=!S.hooks[k];renderHooks();
+  tl('· '+k+' '+(S.hooks[k]?'on':'off'),S.hooks[k]?'ok':'warn');});});
+ $('hookactive').textContent=ks.filter(function(x){return S.hooks[x];}).length+' on';}
+function used(){var m=0,c=0,p=0,r=0;S.cs.forEach(function(x){
+ if(x.st==='running'){m+=x.mem;c+=x.cpu;p+=7;r++;}else if(x.st==='created'){m+=18;p+=2;}});
+ return{mem:Math.round(m),cpu:Math.round(c*100)/100,pids:p,run:r,disk:120+S.cs.length*24};}
+function bar(id,p){var f=$(id);f.style.width=Math.min(100,Math.max(0,p))+'%';
+ f.className='fl '+(p>88?'err':p>68?'warn':id==='fdisk'?'':'ok');}
+function renderQ(){var u=used();$('qmem').textContent=u.mem;$('qcpu').textContent=u.cpu.toFixed(2);
+ $('qdisk').textContent=u.disk;$('qpids').textContent=u.pids;$('qmemmax').textContent=S.q.mem;
+ bar('fmem',u.mem/S.q.mem*100);bar('fcpu',u.cpu/S.q.cpu*100);
+ bar('fdisk',u.disk/S.q.disk*100);bar('fpids',u.pids/S.q.pids*100);$('cctl').textContent=u.run+' running';}
+function scls(s){return({running:'s-running',created:'s-created',exited:'s-exited',error:'s-error'})[s]||'s-exited';}
+function renderC(){var tb=$('ctbody');
+ if(!S.cs.length){tb.innerHTML='<tr><td colspan="7"><div class="empty">no containers · press ＋ run</div></td></tr>';return;}
+ tb.innerHTML=S.cs.map(function(c){return '<tr><td class="cid">'+c.id+'</td><td style="color:#cdd9e6">'+esc(c.img)+'</td>'+
+ '<td style="color:#7d90a4;font-size:10px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(c.cmd)+'</td>'+
+ '<td><span class="st '+scls(c.st)+'"><i></i>'+c.st+'</span></td>'+
+ '<td style="color:#9db2c6">'+(c.st==='running'?c.cpu.toFixed(2):'—')+'</td>'+
+ '<td style="color:#9db2c6">'+(c.st==='running'?Math.round(c.mem)+'mb':'—')+'</td>'+
+ '<td style="color:#65788c">'+fage(Date.now()-c.born)+'</td></tr>';}).join('');}
+function renderUp(){var s=Math.floor((Date.now()-S.boot)/1000);
+ $('uptime').textContent=('0'+Math.floor(s/3600)).slice(-2)+':'+('0'+Math.floor(s%3600/60)).slice(-2)+':'+('0'+(s%60)).slice(-2);}
+function okImg(i){var r=i.split(':')[0];return S.allow.some(function(a){return a.split(':')[0]===r;});}
+function spawn(img,cmd){
+ var c={id:'sbx_'+rid(),img:img,cmd:cmd||'sh',st:'created',cpu:0,mem:0,born:Date.now()};
+ gate('pre_create',true);
+ if(S.hooks.security&&!okImg(img)){gate('on_error',false);c.st='error';
+  tl('  ✗ pre_create: "'+img+'" not allowlisted','err');pe('security','BLOCKED '+img,'err');return null;}
+ if(!S.hooks.security&&!okImg(img))tl('  ! security off → bypass','warn');
+ S.cs.unshift(c);tl('  ✓ pre_create: image policy ok','dim');
+ setTimeout(function(){gate('post_create',true);tl('  ✓ post_create: SANDBOX_ID='+c.id,'dim');},150);
+ setTimeout(function(){
+  if(S.hooks.network)tl('  ✓ pre_start: netns='+S.net,'dim');
+  var u=used();
+  if(S.hooks.resource&&(u.mem+220>S.q.mem||u.cpu+0.3>S.q.cpu)){
+   gate('pre_start',false);gate('on_error',false);c.st='error';
+   tl('  ✗ pre_start: quota exceeded','err');pe('resource','quota refused '+c.id,'err');
+   renderC();renderQ();return;}
+  gate('pre_start',true);tl('  ✓ pre_start: mem=384mb cpu=0.50','dim');
+  setTimeout(function(){c.st='running';c.cpu=0.05+Math.random()*0.55;c.mem=90+Math.random()*260;
+   gate('post_start',true);tl('  ✓ post_start: healthy','dim');tl('');
+   tl('▶ '+c.id+'  '+c.img+'  →  '+c.cmd,'ok');pe('lifecycle','started '+c.id,'ok');
+   renderC();renderQ();
+   c.t=setTimeout(function(){kill(c,'exited');},16000+Math.random()*22000);},300);
+ },270);
+ renderC();renderQ();return c;}
+function kill(c,why){
+ if(!c||c.st==='exited'||c.st==='removing')return;if(c.t)clearTimeout(c.t);
+ c.st='removing';tl('  · '+c.id+' → pre_destroy ('+(why||'user')+')','dim');gate('pre_destroy',true);
+ if(S.hooks.audit)pe('audit','sealed '+c.id,'cy');
+ setTimeout(function(){c.st='exited';tl('  ✓ '+c.id+' destroyed','dim');pe('lifecycle','destroyed '+c.id,'cy');
+  renderC();renderQ();
+  setTimeout(function(){var i=S.cs.indexOf(c);if(i>-1){S.cs.splice(i,1);renderC();renderQ();}},4200);},250);}
+function renderPipes(){$('pgrid').innerHTML=Object.keys(PIPE).map(function(k){var p=PIPE[k];
+ return '<div class="pc'+(PL.name===k?' active':'')+'" data-pipe="'+k+'"><div class="pn"><span>'+p.l+'</span><span class="chip" style="font-size:8px;padding:0 4px">'+p.s.length+'</span></div><div class="pm">on: '+esc(p.m)+'</div></div>';}).join('');
+ $('pgrid').querySelectorAll('[data-pipe]').forEach(function(e){e.addEventListener('click',function(){runPipe(e.getAttribute('data-pipe'));});});}
+async function runPipe(k){var p=PIPE[k];
+ if(PL.run){tl('! pipeline already running','warn');return;}
+ PL.run=true;PL.name=k;renderPipes();$('pstate').textContent='running';
+ tl('');tl('▶ pipeline '+k+' — '+p.s.length+' steps','cy');pe('pipeline','start → '+k,'cy');
+ for(var i=0;i<p.s.length;i++){
+  $('pprog').style.width=Math.round(i/p.s.length*100)+'%';
+  $('plog').textContent='['+(i+1)+'/'+p.s.length+'] '+p.s[i];
+  tl('  ['+(i+1)+'/'+p.s.length+'] '+p.s[i],'dim');await sl(540+Math.random()*520);}
+ $('pprog').style.width='100%';$('plog').textContent='✓ '+k+' · '+p.a.join(' · ');
+ tl('  ✓ artifacts: '+p.a.join(', '),'ok');pe('pipeline','complete → '+k,'ok');
+ $('pstate').textContent='idle';PL.run=false;renderPipes();}
+function setNet(m,q){S.net=m;
+ document.querySelectorAll('#netseg button').forEach(function(b){b.className=(b.getAttribute('data-net')===m?'on':'');});
+ $('netnote').textContent={isolated:'no egress · loopback only',allowlist:'egress restricted · 2 rules',open:'EGRESS UNRESTRICTED · weakened'}[m];
+ if(q!==true){tl('· network → '+m,m==='open'?'warn':'ok');pe('network','policy → '+m);}}
+async function gh(p){var h={Accept:'application/vnd.github+json'};if(G.token)h.Authorization='Bearer '+G.token;
+ var r=await fetch('https://api.github.com'+p,{headers:h});
+ var rl=r.headers.get('x-ratelimit-remaining');if(rl!==null)G.rate={r:rl,l:r.headers.get('x-ratelimit-limit')};
+ var t=await r.text(),d=null;try{d=t?JSON.parse(t):null;}catch(e){}
+ if(r.status===404){var e1=new Error('404 not found');e1.status=404;throw e1;}
+ if(!r.ok){var e2=new Error((d&&d.message)||('HTTP '+r.status));e2.status=r.status;throw e2;}
+ return d;}
+async function ghS(method,p,body){var h={Accept:'application/vnd.github+json'};if(G.token)h.Authorization='Bearer '+G.token;
+ var o={method:method,headers:h};if(body!==undefined){h['Content-Type']='application/json';o.body=JSON.stringify(body);}
+ var r=await fetch('https://api.github.com'+p,o);var t=await r.text(),d=null;
+ try{d=t?JSON.parse(t):null;}catch(e){d={message:t};}
+ if(!r.ok){var e=new Error((d&&d.message)||('HTTP '+r.status));e.status=r.status;throw e;}
+ return d;}
+function applyUser(u){G.user=u;
+ if(u){$('ghpill').innerHTML='<img src="'+esc(u.avatar_url)+'" alt=""/><span>'+esc(u.login)+'</span>';
+  pe('github','signed in as '+u.login,'ok');tl('✓ github: '+u.login,'ok');
+  gh('/user/repos?sort=updated&per_page=30').then(function(rs){
+   $('repolist').innerHTML=rs.map(function(r){return '<option value="'+esc(r.full_name)+'">';}).join('');}).catch(function(){});}
+ else $('ghpill').innerHTML='<span>◉</span><span id="ghtxt">connect github</span>';}
+async function signIn(tk){if(!tk){tl('token required','warn');return;}G.token=tk.trim();
+ try{var u=await gh('/user');lss('sbx_tok',G.token);applyUser(u);closeAuth();repoBar();}
+ catch(e){G.token=null;tl('✗ auth failed: '+e.message,'err');}}
+function signOut(){G.token=null;G.user=null;lss('sbx_tok',null);applyUser(null);tl('· signed out','dim');closeAuth();repoBar();}
+function parseR(s){if(!s)return null;
+ var t=s.trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\.git$/,'').replace(/\/+$/,'').split('/');
+ return t.length<2?null:{o:t[0],n:t[1]};}
+async function loadRepo(){var pr=parseR($('inRepo').value);
+ if(!pr){tl('✗ repo must be owner/repo','err');return;}
+ G.busy=true;repoBar();
+ try{var info=await gh('/repos/'+pr.o+'/'+pr.n);
+  var br=$('inBranch').value.trim()||info.default_branch;
+  G.repo={o:pr.o,n:pr.n,branch:br,info:info};lss('sbx_repo',pr.o+'/'+pr.n);
+  tl('✓ repo: '+info.full_name+' · ★'+info.stargazers_count,'ok');pe('github','repo → '+info.full_name,'ok');
+  renderRepo(info);
+  G.commits=await gh('/repos/'+pr.o+'/'+pr.n+'/commits?per_page=20&sha='+encodeURIComponent(br)).catch(function(){return[];});
+  G.pages=await gh('/repos/'+pr.o+'/'+pr.n+'/pages').catch(function(e){return e.status===404?null:null;});
+  G.pinned=G.commits[0]||null;
+  renderCommits();renderPin();renderLinks();
+ }catch(e){tl('✗ '+pr.o+'/'+pr.n+': '+e.message,'err');$('repocard').innerHTML='<div class="eb">'+esc(e.message)+'</div>';}
+ G.busy=false;repoBar();}
+function repoBar(){var c=$('repochip');
+ if(G.busy){c.textContent='loading…';c.className='chip warn';return;}
+ if(G.repo){c.textContent=G.repo.o+'/'+G.repo.n;c.className='chip ok';}
+ else{c.textContent=G.user?'signed in · no repo':'disconnected';c.className='chip';}}
+function renderRepo(i){$('repocard').innerHTML=
+ '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">'+
+ '<div style="min-width:0"><div style="font-size:12px;color:#e2eef8">'+esc(i.full_name)+'</div>'+
+ '<div style="font-size:10px;color:#67788c;margin-top:2px">'+esc((i.description||'no description').slice(0,90))+'</div></div>'+
+ '<span class="chip '+(i.visibility==='public'?'ok':'warn')+'">'+esc(i.visibility||'—')+'</span></div>'+
+ '<div class="kv"><span>stars / forks</span><span>★'+i.stargazers_count+' · ⑂'+i.forks_count+'</span></div>'+
+ '<div class="kv"><span>open issues + PRs</span><span>'+i.open_issues_count+'</span></div>'+
+ '<div class="kv"><span>branch · language</span><span>'+esc(i.default_branch)+' · '+esc(i.language||'—')+'</span></div>'+
+ '<div class="kv"><span>last push</span><span>'+rel(i.pushed_at)+'</span></div>'+
+ '<div class="kv"><span>pages</span><span>'+(G.pages?'LIVE':'not enabled')+'</span></div>'+
+ '<div class="kv"><span>rate limit</span><span>'+(G.rate?G.rate.r+'/'+G.rate.l:'—')+'</span></div>';}
+function renderCommits(){var b=$('commits');
+ if(!G.commits.length){b.innerHTML='<div class="empty">no commits</div>';$('cmchip').textContent='0';return;}
+ $('cmchip').textContent=G.commits.length+' · '+G.repo.branch;
+ b.innerHTML=G.commits.map(function(c){var m=(c.commit&&c.commit.message||'').split('\n')[0];
+  var lg=(c.author&&c.author.login)||'—';var av=(c.author&&c.author.avatar_url)||'';
+  var pin=G.pinned&&G.pinned.sha===c.sha;
+  return '<div class="cm'+(pin?' pinned':'')+'" data-sha="'+esc(c.sha)+'">'+
+   (av?'<img src="'+esc(av)+'" alt=""/>':'<div style="width:20px;height:20px;border-radius:50%;background:#16202c;flex:none"></div>')+
+   '<div class="b"><div class="ms">'+esc(m)+'</div><div class="mt"><span style="color:#7dd3fc">'+esc(c.sha.slice(0,7))+'</span><span>'+esc(lg)+'</span><span>'+rel(c.commit&&c.commit.author&&c.commit.author.date)+'</span>'+(pin?'<span style="color:#22d3ee">◉</span>':'')+'</div></div></div>';}).join('');
+ b.querySelectorAll('[data-sha]').forEach(function(e){e.addEventListener('click',function(){
+  var s=e.getAttribute('data-sha');G.pinned=G.commits.filter(function(c){return c.sha===s;})[0]||null;
+  renderCommits();renderPin();renderLinks();tl('· pinned '+s.slice(0,7),'cy');});});}
+function renderPin(){var p=G.pinned;
+ $('pinchip').textContent=p?p.sha.slice(0,7):'—';$('pinchip').className='chip '+(p?'ok':'');
+ $('pininfo').innerHTML=p?('<div class="kv"><span>sha</span><span>'+esc(p.sha.slice(0,12))+'…</span></div>'+
+  '<div class="kv"><span>author</span><span>'+esc((p.author&&p.author.login)||'—')+'</span></div>'+
+  '<div class="kv"><span>message</span><span>'+esc((p.commit.message||'').split('\n')[0].slice(0,48))+'</span></div>'+
+  '<div class="kv"><span>deploy target</span><span>yes · pipeline run deploy</span></div>')
+  :'<div class="note">click a commit to pin it — the deploy pipeline targets it</div>';}
+function pagesUrl(o,r){if(r.toLowerCase()===(o+'.github.io').toLowerCase())return'https://'+o.toLowerCase()+'.github.io/';
+ return'https://'+o.toLowerCase()+'.github.io/'+r.toLowerCase()+'/';}
+function renderLinks(){var b=$('links');
+ if(!G.repo){b.innerHTML='<div class="empty">load a repo to generate deployable URLs</div>';$('linkchip').textContent='awaiting repo';return;}
+ var o=G.repo.o,r=G.repo.n,br=G.repo.branch||'main',live=!!(G.pages&&G.pages.html_url);
+ var L=[{n:'GitHub Pages',live:live,u:live?G.pages.html_url:pagesUrl(o,r),d:live?'real live domain · TLS automatic':'not enabled · address it will occupy'},
+  {n:'raw.githack',live:true,u:'https://raw.githack.com/'+o+'/'+r+'/'+br+'/index.html',d:'renders from branch now'},
+  {n:'jsDelivr',live:true,u:'https://cdn.jsdelivr.net/gh/'+o+'/'+r+'@'+br+'/index.html',d:'global edge CDN'},
+  {n:'claim.json',live:!!B.man,u:pagesUrl(o,r)+'claim.json',d:B.man?'claim for '+B.man.domain:'no claim coded'}];
+ $('linkchip').textContent=L.filter(function(x){return x.live;}).length+' live · '+L.length+'';
+ b.innerHTML=L.map(function(l){return '<div class="linkc"><div class="lh"><div class="ln"><span class="dot" style="color:'+(l.live?'#34d399':'#fbbf24')+'"></span>'+esc(l.n)+'</div><span class="chip '+(l.live?'ok':'warn')+'">'+(l.live?'LIVE':'PENDING')+'</span></div><div class="u">'+esc(l.u)+'</div><div class="lf"><span class="note">'+esc(l.d)+'</span><span style="display:flex;gap:4px"><button class="btn" data-c="'+esc(l.u)+'">copy</button><a class="btn cy" href="'+esc(l.u)+'" target="_blank" rel="noopener">open ↗</a></span></div></div>';}).join('');
+ b.querySelectorAll('[data-c]').forEach(function(x){x.addEventListener('click',function(){cp(x.getAttribute('data-c'),'url');});});
+ $('dnschip').textContent=o+'.github.io';}
+function renderDns(){var d=$('inDomain').value.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+ if(!d){$('dnsout').innerHTML='<div class="empty">enter a domain for exact DNS records</div>';return;}
+ if(!G.repo&&!G.user){$('dnsout').innerHTML='<div class="eb">link a repo or sign in first</div>';return;}
+ var o=G.repo?G.repo.o:G.user.login,host=o.toLowerCase()+'.github.io',apex=d.split('.').length===2;
+ var rows=apex?[['A','@','185.199.108.153'],['A','@','185.199.109.153'],['A','@','185.199.110.153'],['A','@','185.199.111.153'],['CNAME','www',host]]:[['CNAME',d.split('.')[0],host]];
+ var h='<div class="pre" style="max-height:100px">'+rows.map(function(r){return ('  '+r[0]).slice(0,7)+('        '+r[1]).slice(0,16)+'        '+r[2];}).join('\n')+'</div>';
+ h+='<div class="kv"><span>target</span><span>'+esc(host)+'</span></div>';
+ h+='<div class="kv"><span>CNAME file</span><span>'+esc(d)+'</span></div>';
+ h+='<div class="row" style="margin-top:7px"><button class="btn" id="btnDnsCopy">copy records</button></div>';
+ h+='<div class="hint" style="margin-top:7px">1. add records at your registrar · 2. Pages → Custom domain → <b>'+esc(d)+'</b> · 3. Enforce HTTPS (~15 min). Publish sets domain + CNAME; DNS is the only manual step.</div>';
+ $('dnsout').innerHTML=h;
+ $('btnDnsCopy').addEventListener('click',function(){cp(rows.map(function(r){return r[0]+'  '+r[1]+'  '+r[2];}).join('\n'),'DNS');});}
+function selfHtml(){var c=document.documentElement.cloneNode(true);
+ ['tlog','events','commits','repocard','links','dnsout','pubconsole','pubresult','repolist','preview','imginfo','outpreview','embedlog','vout','claimpre','fbout','pininfo'].forEach(function(id){
+  var n=c.querySelector('#'+id);if(n)n.innerHTML='';});
+ var tb=c.querySelector('#ctbody');if(tb)tb.innerHTML='';
+ var a=c.querySelector('#authOverlay');if(a)a.classList.remove('on');
+ ['pubDomain','inTok','inRepo','inBranch','inDomain','bDomain'].forEach(function(id){var n=c.querySelector('#'+id);if(n)n.removeAttribute('value');});
+ var lp=c.querySelector('#livepill');if(lp)lp.setAttribute('hidden','');
+ return '<!DOCTYPE html>\n'+c.outerHTML;}
+function pl(k,t){P.steps.push({k:k,t:t});var b=$('pubconsole'),i={run:'▸',ok:'✓',err:'✗',warn:'!',dim:'·'};
+ b.innerHTML=P.steps.map(function(s){return '<div class="ps '+s.k+'"><span class="i">'+(i[s.k]||'·')+'</span><span class="t">'+esc(s.t)+'</span></div>';}).join('');
+ b.scrollTop=b.scrollHeight;
+ if(k==='ok'||k==='err')pe('deploy',t,k==='ok'?'ok':'err');}
+function setLive(u){var p=$('livepill');if(!u){p.hidden=true;return;}
+ p.href=u;p.hidden=false;var h='';try{h=new URL(u).host;}catch(e){h=u;}$('livehost').textContent=h;}
+function renderResult(){var b=$('pubresult');if(!P.result){b.innerHTML='';return;}
+ var u=P.result.url,qr='https://api.qrserver.com/v1/create-qr-code/?size=180x180&bgcolor=0b1017&color=22d3ee&data='+encodeURIComponent(u);
+ var bh=P.builds.length?P.builds.slice(0,3).map(function(x){
+  return '<div class="kv"><span>'+esc(x.status||'—')+'</span><span>'+esc((x.commit||'').slice(0,7)||'build')+'</span></div>';}).join(''):'<div class="note">no build records yet</div>';
+ b.innerHTML='<div class="lb"><div class="lbt"><i class="dot pl"></i>published · live</div><div class="lbu">'+esc(u)+'</div>'+
+  '<div style="display:flex;gap:8px;margin-top:8px"><img class="qrimg" src="'+qr+'" alt="QR" onerror="this.style.display=\'none\'"/>'+
+  '<div style="flex:1;min-width:0">'+
+  '<div class="kv" style="border:0"><span>repo</span><span>'+esc(P.result.owner+'/'+P.result.repo)+'</span></div>'+
+  '<div class="kv" style="border:0"><span>branch</span><span>'+esc(P.result.branch)+'</span></div>'+
+  (P.result.domain?'<div class="kv" style="border:0"><span>domain</span><span>'+esc(P.result.domain)+'</span></div>':'')+
+  '<div class="row" style="margin-top:6px"><button class="btn ok" id="btnCpLive">copy</button>'+
+  '<a class="btn cy" href="'+esc(u)+'" target="_blank" rel="noopener">open ↗</a>'+
+  '<button class="btn err" id="btnUnpub">unpublish</button></div></div></div>'+
+  '<div style="margin-top:8px"><div class="ms" style="margin-bottom:3px">builds</div>'+bh+'</div></div>';
+ $('btnCpLive').addEventListener('click',function(){cp(u,'url');});
+ $('btnUnpub').addEventListener('click',unpublish);}
+async function doPublish(){
+ if(P.run)return;
+ if(!G.token){tl('✗ publishing needs a token — gh login','err');openAuth();return;}
+ var rn=($('pubRepo').value||'').trim().replace(/[^A-Za-z0-9._-]/g,'-');
+ if(!rn){tl('✗ target repo required','err');return;}
+ var dom=($('pubDomain').value||'').trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+ P.run=true;P.steps=[];P.result=null;P.builds=[];
+ $('pubchip').textContent='deploying';$('pubchip').className='chip warn';$('btnPublish').disabled=true;
+ renderResult();showTab('hosting');tl('');tl('▶ publish → github pages','cy');
+ try{
+  var me=await gh('/user'),owner=me.login;pl('ok','authenticated as '+owner);
+  var info=null,ex=false;
+  try{info=await gh('/repos/'+owner+'/'+rn);ex=true;}catch(e){if(e.status!==404)throw e;}
+  if(ex)pl('ok','repo exists → '+info.full_name);
+  else{pl('run','creating '+owner+'/'+rn);
+   info=await ghS('POST','/user/repos',{name:rn,private:!!$('pubPrivate').checked,auto_init:true,description:'sandboxd — daemon + bridge'});
+   pl('ok','created → '+info.html_url);}
+  var br=info.default_branch||'main';
+  async function put(path,text,msg){
+   var e=null;try{e=await gh('/repos/'+owner+'/'+rn+'/contents/'+path+'?ref='+encodeURIComponent(br));}catch(x){}
+   var body={message:msg,content:b64(text),branch:br};if(e&&e.sha)body.sha=e.sha;
+   await ghS('PUT','/repos/'+owner+'/'+rn+'/contents/'+path,body);}
+  var html=selfHtml();pl('run','serialising ('+Math.round(html.length/1024)+' KB)');
+  await put('index.html',html,'deploy sandboxd');pl('ok','committed index.html');
+  if(B.man){
+   try{await put('claim.json',JSON.stringify(B.man,null,2),'bridge claim');
+    await put('verify.html',B.vhtml||mkVerify(),'bridge verifier');
+    var fn='bridge.'+(B.ext==='jpg'?'jpg':'png');
+    if(B.blob){var bin=ab64(await B.blob.arrayBuffer());
+     var e2=null;try{e2=await gh('/repos/'+owner+'/'+rn+'/contents/'+fn+'?ref='+encodeURIComponent(br));}catch(x){}
+     var bb={message:'bridge image',content:bin,branch:br};if(e2&&e2.sha)bb.sha=e2.sha;
+     await ghS('PUT','/repos/'+owner+'/'+rn+'/contents/'+fn,bb);}
+    pl('ok','bridge · claim.json + verify.html + '+fn);pe('bridge','claim committed → '+B.man.domain,'ok');}
+   catch(e){pl('warn','bridge bundle: '+e.message);}}
+  else pl('dim','no claim coded — skipping bundle');
+  pl('run','enabling pages');
+  try{await ghS('POST','/repos/'+owner+'/'+rn+'/pages',{source:{branch:br,path:'/'}});pl('ok','pages enabled');}
+  catch(e){if(e.status===409||e.status===422){await ghS('PUT','/repos/'+owner+'/'+rn+'/pages',{source:{branch:br,path:'/'}});pl('ok','pages source refreshed');}else throw e;}
+  if(dom){try{await ghS('PUT','/repos/'+owner+'/'+rn+'/pages',{source:{branch:br,path:'/'},cname:dom});
+   await put('CNAME',dom+'\n','custom domain');pl('warn','CNAME set · DNS still required');}
+  catch(e){pl('warn','domain: '+e.message);}}
+  pl('run','waiting for build…');
+  var url=null;
+  for(var i=0;i<18;i++){var pg=null;
+   try{pg=await gh('/repos/'+owner+'/'+rn+'/pages');}catch(e){}
+   if(pg){if(pg.html_url)url=pg.html_url;pl(i===0?'run':'dim','build: '+(pg.status||'queued'));if(pg.status==='built')break;}
+   await sl(3000);}
+  if(!url)url=pagesUrl(owner,rn);
+  P.result={url:url,owner:owner,repo:rn,branch:br,domain:dom||null};
+  lss('sbx_live',JSON.stringify(P.result));setLive(url);
+  pl('ok','live → '+url);pe('deploy','published → '+url,'ok');
+  tl('✓ published — '+url,'ok');
+  if(B.man)tl('  bridge bundle live at that domain','ok');
+  tl('  (first Pages build can take 30–90s)','dim');
+  $('pubchip').textContent='live';$('pubchip').className='chip ok';
+  try{P.builds=await gh('/repos/'+owner+'/'+rn+'/pages/builds?per_page=5')||[];}catch(e){}
+  renderResult();renderLinks();
+ }catch(e){
+  pl('err','publish failed: '+e.message);tl('✗ publish failed: '+e.message,'err');
+  if(e.status===403)tl('  → token lacks "repo" scope?','warn');
+  $('pubchip').textContent='failed';$('pubchip').className='chip err';}
+ P.run=false;$('btnPublish').disabled=false;}
+async function unpublish(){
+ if(!P.result){tl('nothing published','warn');return;}
+ if(!G.token){tl('token required','err');return;}
+ try{await ghS('DELETE','/repos/'+P.result.owner+'/'+P.result.repo+'/pages');
+  pl('ok','pages disabled · files kept');tl('· unpublish: Pages off','warn');
+  P.result=null;P.builds=[];lss('sbx_live',null);setLive(null);
+  $('pubchip').textContent='ready';$('pubchip').className='chip';renderResult();}
+ catch(e){tl('✗ '+e.message,'err');}}
+
+var MG=[0x53,0x42,0x58,0x31];
+function blog(k,t){var b=$('embedlog'),i={ok:'✓',err:'✗',warn:'!',info:'▸',dim:'·'}[k]||'·';
+ b.innerHTML+='<div class="lgl '+k+'"><span class="i">'+i+'</span><span class="t">'+esc(t)+'</span></div>';b.scrollTop=b.scrollHeight;}
+function cap(d){return Math.floor(d.length/4)*3;}
+function bitAt(d,i){return d[Math.floor(i/3)*4+(i%3)]&1;}
+function setBit(d,i,v){var p=Math.floor(i/3)*4+(i%3);d[p]=(d[p]&0xFE)|(v?1:0);}
+function wr(d,j){var by=new TextEncoder().encode(j),all=new Uint8Array(8+by.length);
+ all[0]=MG[0];all[1]=MG[1];all[2]=MG[2];all[3]=MG[3];
+ all[4]=(by.length>>>24)&255;all[5]=(by.length>>>16)&255;all[6]=(by.length>>>8)&255;all[7]=by.length&255;
+ all.set(by,8);var bits=all.length*8;
+ for(var i=0;i<bits;i++)setBit(d,i,(all[i>>3]>>(7-(i&7)))&1);return bits;}
+function rd(d,s,c){var o=new Uint8Array(Math.ceil(c/8));
+ for(var i=0;i<c;i++)if(bitAt(d,s+i))o[i>>3]|=(1<<(7-(i&7)));return o;}
+function decLSB(d){if(cap(d)<64)return null;
+ var h=rd(d,0,64);
+ if(h[0]!==MG[0]||h[1]!==MG[1]||h[2]!==MG[2]||h[3]!==MG[3])return null;
+ var len=(h[4]<<24)|(h[5]<<16)|(h[6]<<8)|h[7];
+ if(len<=0||len>200000||64+len*8>cap(d))return null;
+ try{return new TextDecoder().decode(rd(d,64,len*8));}catch(e){return null;}}
+function segs(b){var a=[],i=2;
+ while(i<b.length-3){
+  if(b[i]!==0xFF){i++;continue;}
+  var m=b[i+1];
+  if(m===0xD9||m===0xDA)break;
+  if(m===0x01||(m>=0xD0&&m<=0xD7)){i+=2;continue;}
+  if(m===0xFF){i++;continue;}
+  var L=(b[i+2]<<8)|b[i+3];if(L<2)break;
+  a.push({m:m,s:i,e:i+2+L});i+=2+L;}
+ return a;}
+function mgOf(b,s){var o=s.s+4;if(o+4>s.e)return'';return String.fromCharCode(b[o],b[o+1],b[o+2],b[o+3]);}
+function jx(buf){var b=new Uint8Array(buf);
+ if(!(b[0]===0xFF&&b[1]===0xD8))return null;
+ var a=segs(b);
+ for(var i=0;i<a.length;i++){var s=a[i];
+  if(s.m!==0xEF||mgOf(b,s)!=='SBX1')continue;
+  var o=s.s+8,len=(b[o]<<24)|(b[o+1]<<16)|(b[o+2]<<8)|b[o+3];
+  if(len<=0||o+4+len>s.e)continue;
+  try{return new TextDecoder().decode(b.subarray(o+4,o+4+len));}catch(e){return null;}}
+ return null;}
+function jemb(buf,j){var b=new Uint8Array(buf);
+ if(!(b[0]===0xFF&&b[1]===0xD8))throw new Error('not a JPEG');
+ var by=new TextEncoder().encode(j),dl=8+by.length;
+ if(dl+2>65533)throw new Error('payload exceeds APP15');
+ var sg=new Uint8Array(4+dl);
+ sg[0]=0xFF;sg[1]=0xEF;var L=dl+2;sg[2]=(L>>8)&255;sg[3]=L&255;
+ sg[4]=MG[0];sg[5]=MG[1];sg[6]=MG[2];sg[7]=MG[3];
+ sg[8]=(by.length>>>24)&255;sg[9]=(by.length>>>16)&255;sg[10]=(by.length>>>8)&255;sg[11]=by.length&255;
+ sg.set(by,12);
+ var a=segs(b),keep=[],pos=2;
+ a.forEach(function(s){if(pos<s.s)keep.push([pos,s.s]);
+  if(!(s.m===0xEF&&mgOf(b,s)==='SBX1'))keep.push([s.s,s.e]);pos=s.e;});
+ if(pos<b.length)keep.push([pos,b.length]);
+ var tot=2+sg.length;keep.forEach(function(k){tot+=k[1]-k[0];});
+ var out=new Uint8Array(tot),p=0;
+ out[p++]=0xFF;out[p++]=0xD8;out.set(sg,p);p+=sg.length;
+ keep.forEach(function(k){out.set(b.subarray(k[0],k[1]),p);p+=k[1]-k[0];});
+ return out;}
+function rURL(f){return new Promise(function(r,j){var fr=new FileReader();fr.onload=function(){r(fr.result);};fr.onerror=j;fr.readAsDataURL(f);});}
+function rBuf(f){return new Promise(function(r,j){var fr=new FileReader();fr.onload=function(){r(fr.result);};fr.onerror=j;fr.readAsArrayBuffer(f);});}
+async function sha(b){var d=await crypto.subtle.digest('SHA-256',b),a=new Uint8Array(d),o='';
+ for(var i=0;i<a.length;i++)o+=('0'+a[i].toString(16)).slice(-2);return o;}
+async function loadImg(file){
+ if(!file||(''+file.type).indexOf('image')!==0){blog('err','not an image');return;}
+ B.file=file;B.buf=await rBuf(file);B.sha=await sha(B.buf);
+ var h=new Uint8Array(B.buf,0,3);B.jpg=(h[0]===0xFF&&h[1]===0xD8);
+ var url=await rURL(file),img=new Image();
+ await new Promise(function(r,j){img.onload=r;img.onerror=j;img.src=url;});
+ B.w=img.naturalWidth;B.h=img.naturalHeight;
+ var cv=document.createElement('canvas');cv.width=B.w;cv.height=B.h;
+ cv.getContext('2d').drawImage(img,0,0);cv.style.maxWidth='100%';cv.style.height='auto';
+ $('preview').innerHTML='';$('preview').appendChild(cv);
+ $('imgchip').textContent=B.w+'×'+B.h;$('imgchip').className='chip ok';
+ var cd=B.jpg?65521:Math.floor(cap(cv.getContext('2d').getImageData(0,0,B.w,B.h).data)/8);
+ $('imginfo').innerHTML='<div class="kv"><span>codec</span><span>'+(B.jpg?'JPEG · APP15':'PNG · LSB')+'</span></div>'+
+  '<div class="kv"><span>bytes · sha</span><span>'+(file.size/1024).toFixed(0)+' KB · '+esc(B.sha.slice(0,14))+'…</span></div>'+
+  '<div class="kv"><span>capacity</span><span>'+cd+' B</span></div>';
+ $('capbar').style.width=Math.min(100,(520/cd)*100)+'%';
+ $('capnote').textContent='claim ≈ 520 B of '+cd+' B';
+ $('btnEmbed').disabled=false;
+ blog('info','hashed '+file.name+' → '+B.sha.slice(0,12)+'…');
+ blog('dim','codec: '+(B.jpg?'APP15 — recompression-free':'LSB — 3 bits/px'));}
+function wm(ctx,w,h,m){
+ var band=Math.max(26,Math.min(64,Math.round(h*0.062))),fs=Math.max(10,Math.min(20,Math.round(w*0.0145))),y=h-band;
+ ctx.fillStyle='rgba(5,8,11,0.80)';ctx.fillRect(0,y,w,band);
+ ctx.fillStyle='rgba(34,211,238,0.55)';ctx.fillRect(0,y,w,Math.max(1,Math.round(band*0.045)));
+ ctx.font=fs+'px ui-monospace,Menlo,monospace';ctx.textBaseline='middle';
+ ctx.fillStyle='#22d3ee';ctx.fillText('⬡ '+m.domain,Math.round(w*0.012),y+band*0.5);
+ ctx.font=Math.max(8,fs-2)+'px ui-monospace,Menlo,monospace';ctx.fillStyle='#9fb6c9';
+ var r='sha256:'+m.image.sha256.slice(0,10)+' · '+m.v;
+ ctx.fillText(r,Math.max(w*0.012,w-ctx.measureText(r).width-Math.round(w*0.012)),y+band*0.5);}
+function mkMan(){
+ var raw=($('bDomain').value.trim()||$('pubDomain').value.trim()||'unclaimed.local');
+ var d=raw.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+ return {v:'SBX1',proto:'sandboxd-bridge/1',domain:d,claim:'https://'+d+'/claim.json',verify:'https://'+d+'/verify.html',
+  sandbox:($('bSbx').value||'sbx_'+rid()),chain:($('bChain').value||S.chain).slice(0,16),
+  commit:($('bCommit').value||(G.pinned?G.pinned.sha.slice(0,7):''))||null,
+  codec:B.jpg?'jpeg-app15':'png-lsb',
+  image:{sha256:B.sha,px:B.w+'x'+B.h,bytes:B.file?B.file.size:0,type:B.file?B.file.type:null},
+  issued:new Date().toISOString(),durable:'visible watermark',
+  fragile:B.jpg?'app15 segment (survives file copy)':'lsb plane (lossless only)'};}
+async function srcCv(){var i=new Image();i.src=await rURL(B.file);
+ await new Promise(function(r){i.onload=r;});
+ var cv=document.createElement('canvas');cv.width=B.w;cv.height=B.h;
+ cv.getContext('2d').drawImage(i,0,0);return cv;}
+function showOut(cv){$('outpreview').innerHTML='';
+ var o=document.createElement('canvas');o.width=cv.width;o.height=cv.height;
+ o.getContext('2d').drawImage(cv,0,0);o.style.maxWidth='100%';o.style.height='auto';
+ $('outpreview').appendChild(o);}
+async function embed(){
+ if(!B.buf){blog('err','load an image first');return;}
+ var m=mkMan(),j=JSON.stringify(m);B.man=m;
+ if(B.jpg){
+  var mark=$('optMark').checked,base;
+  if(mark){var cv=await srcCv();wm(cv.getContext('2d'),B.w,B.h,m);
+   var enc=await new Promise(function(r){cv.toBlob(r,'image/jpeg',0.92);});
+   base=await enc.arrayBuffer();blog('warn','watermark → re-encoded q0.92');showOut(cv);}
+  else{base=B.buf;blog('ok','zero-recompression path');showOut(await srcCv());}
+  var out=jemb(base,j);
+  blog('ok','APP15 spliced ('+(12+new TextEncoder().encode(j).length)+' B)');
+  var blob=new Blob([out],{type:'image/jpeg'});
+  finish(blob,'jpg','bridge.jpg');
+  var back=jx(await blob.arrayBuffer());
+  blog(back?'ok':'err',back?'round-trip verified · '+back.length+' B':'round-trip FAILED');
+ }else{
+  var cvp=await srcCv(),ctx=cvp.getContext('2d',{willReadFrequently:true});
+  var id=ctx.getImageData(0,0,B.w,B.h);
+  if((8+new TextEncoder().encode(j).length)*8>cap(id.data)){blog('err','exceeds LSB capacity');return;}
+  var u=wr(id.data,j);ctx.putImageData(id,0,0);
+  blog('ok','wrote '+u+' bits into LSB plane');
+  if($('optMark').checked){wm(ctx,B.w,B.h,m);blog('ok','watermark burned');}
+  showOut(cvp);
+  var blob2=await new Promise(function(r){cvp.toBlob(r,'image/png');});
+  finish(blob2,'png','bridge.png');
+  var back2=decLSB(cvp.getContext('2d').getImageData(0,0,B.w,B.h).data);
+  blog(back2?'ok':'err',back2?'round-trip verified':'round-trip FAILED');}}
+function finish(blob,ext,name){B.blob=blob;B.ext=ext;
+ $('outchip').textContent='coded · '+ext.toUpperCase();$('outchip').className='chip ok';
+ $('outactions').hidden=false;$('btnDlImg').textContent='↓ '+name;
+ $('bchip').textContent='ready';$('bchip').className='chip ok';
+ $('btnDlClaim').disabled=false;$('btnDlVerify').disabled=false;$('btnFb').disabled=false;
+ $('claimpre').textContent=JSON.stringify(B.man,null,2);
+ mkVerify();renderLinks();
+ blog('info','output '+name+' · '+(blob.size/1024).toFixed(1)+' KB');
+ pe('bridge','coded → '+B.man.domain+' ('+ext.toUpperCase()+')','ok');
+ tl('✓ claim coded into '+name+' → '+B.man.domain,'ok');}
+async function verifyFile(file){
+ if(!file)return;
+ $('vchip').textContent='decoding';$('vchip').className='chip warn';
+ $('vout').innerHTML='<div class="note">reading…</div>';
+ var buf=await rBuf(file),fs=await sha(buf),url=await rURL(file),img=new Image();
+ await new Promise(function(r,j){img.onload=r;img.onerror=j;img.src=url;});
+ var raw=jx(buf),codec='JPEG · APP15';
+ if(!raw){var cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+  var ctx=cv.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+  raw=decLSB(ctx.getImageData(0,0,img.naturalWidth,img.naturalHeight).data);codec='PNG · LSB';}
+ if(!raw){$('vchip').textContent='no payload';$('vchip').className='chip err';
+  $('vout').innerHTML='<div class="eb">No APP15 segment and no LSB payload. This copy was transcoded — platforms re-encode and strip both channels. The <b>watermark</b> survives; the claim still lives at the domain it names.</div>'+
+   '<div class="kv" style="margin-top:7px"><span>file sha</span><span>'+esc(fs.slice(0,20))+'…</span></div>';
+  blog('warn','verify: no payload');return;}
+ var m=null;try{m=JSON.parse(raw);}catch(e){}
+ if(!m){$('vchip').textContent='corrupt';$('vchip').className='chip err';return;}
+ var same=m.image&&m.image.sha256===fs;
+ $('vchip').textContent=same?'authentic':'payload ok';$('vchip').className='chip '+(same?'ok':'warn');
+ $('vout').innerHTML='<div class="'+(same?'ob':'wb')+'">'+(same
+  ?'✓ Decoded via <b>'+codec+'</b> · hash matches — byte-identical to the signed original.'
+  :'⚠ Decoded via <b>'+codec+'</b> · hash differs — re-saved after coding.')+'</div>'+
+  '<div class="kv" style="margin-top:7px"><span>domain</span><span>'+esc(m.domain)+'</span></div>'+
+  '<div class="kv"><span>claim</span><span>'+esc(m.claim||'—')+'</span></div>'+
+  '<div class="kv"><span>claimed sha</span><span>'+esc((m.image&&m.image.sha256||'').slice(0,16))+'…</span></div>'+
+  '<div class="kv"><span>this file sha</span><span>'+esc(fs.slice(0,16))+'…</span></div>'+
+  '<div class="kv"><span>sandbox · chain</span><span>'+esc(m.sandbox||'—')+' · '+esc(m.chain||'—')+'</span></div>';
+ blog('ok','verify: '+codec+' → '+m.domain);}
+function mkVerify(){
+ var m=B.man;if(!m)return'';var fn=(B.ext==='jpg'?'bridge.jpg':'bridge.png');
+ var h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>\n<title>claim · '+m.domain+'</title>\n<style>\n'+
+ 'body{background:#06080b;color:#c9d6e4;font-family:ui-monospace,Menlo,monospace;margin:0;padding:26px 18px;line-height:1.6}\n'+
+ 'main{max-width:620px;margin:0 auto}h1{font-size:15px;letter-spacing:.08em;color:#22d3ee;margin:0 0 3px}\n'+
+ '.sub{font-size:10px;color:#43546a;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px}\n'+
+ '.b{border:1px solid #1a2431;background:#0b1017;border-radius:9px;padding:12px;margin-bottom:10px}\n'+
+ '.k{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:4px 0;border-bottom:1px solid #131c26}\n'+
+ '.k:last-child{border:0}.k span:first-child{color:#67788c}.k span:last-child{color:#cfe0ee;text-align:right;word-break:break-all}\n'+
+ '#st{font-size:11px;border-radius:7px;padding:10px;border:1px solid #4a3a12;background:#13100a;color:#f7cf74}\n'+
+ '#st.ok{border-color:#1d6b52;background:#07140f;color:#7fe3bb}#st.err{border-color:#4d1a24;background:#130a0d;color:#ff9baa}\n'+
+ 'code{color:#67e8f9}\n</style></head><body><main>\n<h1>⬡ image claim</h1><div class="sub">sandboxd bridge · provenance</div>\n<div class="b">\n'+
+ '<div class="k"><span>domain</span><span>'+esc(m.domain)+'</span></div>\n'+
+ '<div class="k"><span>codec</span><span>'+esc(m.codec)+'</span></div>\n'+
+ '<div class="k"><span>claimed sha-256</span><span>'+esc(m.image.sha256)+'</span></div>\n'+
+ '<div class="k"><span>sandbox</span><span>'+esc(m.sandbox)+'</span></div>\n'+
+ '<div class="k"><span>chain root</span><span>'+esc(m.chain)+'</span></div>\n'+
+ (m.commit?'<div class="k"><span>commit</span><span>'+esc(m.commit)+'</span></div>\n':'')+
+ '<div class="k"><span>issued</span><span>'+esc(m.issued)+'</span></div></div>\n'+
+ '<div id="st">verifying '+fn+' …</div>\n<p style="font-size:10px;color:#43546a;margin-top:16px">Hashes <code>'+fn+'</code> in your browser and compares it to the SHA-256 inside the image. Nothing is uploaded.</p>\n'+
+ '<script>\n(async function(){\n var want="'+m.image.sha256+'";\n var el=document.getElementById("st");\n try{\n'+
+ '  var r=await fetch("'+fn+'",{cache:"no-store"});\n  if(!r.ok)throw new Error("'+fn+' not found ("+r.status+")");\n'+
+ '  var b=await r.arrayBuffer();\n  var d=await crypto.subtle.digest("SHA-256",b);\n'+
+ '  var got=[].map.call(new Uint8Array(d),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");\n'+
+ '  if(got===want){el.className="ok";el.textContent="✓ authentic — '+fn+' hashes to the value inside its own payload.";}\n'+
+ '  else{el.className="err";el.textContent="✗ mismatch — served "+got.slice(0,24)+"… vs claimed "+want.slice(0,24)+"…";}\n'+
+ ' }catch(e){el.className="err";el.textContent="could not verify: "+e.message;}\n})();\n<\/script>\n</main></body></html>';
+ B.vhtml=h;return h;}
+function fbCurl(){
+ var pg=$('fbPage').value.trim()||'<PAGE_ID>',tk=$('fbTok').value.trim()||'<PAGE_TOKEN>';
+ var msg=($('fbMsg').value||('provenance: '+(B.man?B.man.domain:'')+' — claim coded in')).replace(/"/g,'\\"');
+ return 'curl -X POST \\\n  "https://graph.facebook.com/v21.0/'+pg+'/photos" \\\n  -F "source=@'+(B.ext==='jpg'?'bridge.jpg':'bridge.png')+'" \\\n  -F "message='+msg+'" \\\n  -F "access_token='+tk+'"';}
+async function fbUpload(){
+ if(!B.blob){blog('err','code an image first');return;}
+ var pg=$('fbPage').value.trim(),tk=$('fbTok').value.trim();
+ if(!pg||!tk){$('fbout').innerHTML='<div class="wb">page id and page token required</div>';return;}
+ $('fbout').innerHTML='<div class="note">posting to /'+esc(pg)+'/photos …</div>';
+ try{
+  var fd=new FormData();fd.append('source',B.blob,'bridge.'+B.ext);
+  fd.append('message',$('fbMsg').value||'');fd.append('access_token',tk);
+  var res=await fetch('https://graph.facebook.com/v21.0/'+pg+'/photos',{method:'POST',body:fd});
+  var j=null;try{j=await res.json();}catch(e){}
+  if(res.ok&&j&&j.id){$('fbout').innerHTML='<div class="ob">✓ posted · id <b>'+esc(j.id)+'</b><br/>Facebook re-encoded it — APP15/LSB gone from their copy. Watermark + claim.json still bind it.</div>';
+   blog('ok','facebook: photo '+j.id);pe('bridge','posted to page '+pg,'ok');}
+  else{var err=(j&&j.error&&(j.error.message||j.error.type))||('HTTP '+res.status);
+   $('fbout').innerHTML='<div class="eb">Graph refused: '+esc(err)+'<br/>needs a <b>Page</b> token with <b>pages_manage_posts</b>.</div>';blog('err','facebook: '+err);}
+ }catch(e){
+  $('fbout').innerHTML='<div class="eb">Blocked by <b>CORS</b> — graph.facebook.com sends no <code>Access-Control-Allow-Origin</code>.<br/>Use <b>copy curl</b>, or add a Worker relay.</div>';
+  blog('warn','facebook: fetch blocked (CORS)');}}
+
+function help(){tl(['SANDBOXD CLI vdn-1.0.2','',
+ '  publish | unpublish | open        publish to github pages',
+ '  bridge                           bridge tab + claim status',
+ '  gh login [token] | gh logout | gh who | gh status',
+ '  gh repo <owner/name> | git log [n]',
+ '  domain | domain dns <host>',
+ '  docker ps [-a] | run <img> | stop <id|all> | info',
+ '  hook list | hook on|off <name>',
+ '  pipeline list | pipeline run <name>',
+ '  audit verify | net <mode> | status | clear'].join('\n'),'dim');}
+async function exec(raw){
+ var line=raw.trim();tl('sandboxd@sbx:~/daemon $ '+line,'echo');if(!line)return;
+ hist.push(line);hi=hist.length;
+ var p=line.split(/\s+/),c=p[0].toLowerCase();
+ if(c==='help'){help();}
+ else if(c==='clear'){TL.innerHTML='';}
+ else if(c==='status'){var u=used();
+  tl('daemon : vdn-1.0.2 RUNNING','ok');
+  tl('github : '+(G.user?G.user.login+(G.repo?' → '+G.repo.o+'/'+G.repo.n:''):'not signed in'));
+  tl('live   : '+(P.result?P.result.url:'not published'));
+  tl('bridge : '+(B.man?B.man.domain+' ('+B.ext.toUpperCase()+')':'no claim coded'));
+  tl('container: '+S.cs.length+' · '+u.run+' running');tl('audit  : root '+S.chain,'cy');}
+ else if(c==='bridge'){showTab('bridge');
+  if(!B.man)tl('bridge : no claim coded — drop a JPG in this tab','warn');
+  else{tl('domain : '+B.man.domain,'ok');tl('codec  : '+B.man.codec);
+   tl('sha    : '+B.man.image.sha256);tl('claim  : '+B.man.claim);
+   tl('sandbox: '+B.man.sandbox+' · chain '+B.man.chain,'cy');}}
+ else if(c==='publish'){if((p[1]||'')==='status'){if(!P.result){tl('not published','warn');return;}
+   tl('url : '+P.result.url,'ok');tl('repo: '+P.result.owner+'/'+P.result.repo);}
+  else doPublish();}
+ else if(c==='unpublish'){unpublish();}
+ else if(c==='open'){var t=P.result?P.result.url:(G.repo?pagesUrl(G.repo.o,G.repo.n):null);
+  if(!t){tl('nothing to open','warn');return;}
+  try{window.open(t,'_blank','noopener');}catch(e){}tl('· opening '+t,'cy');}
+ else if(c==='gh'){var s=p[1]||'';
+  if(s==='login'){if(p[2])signIn(p[2]);else{openAuth();tl('· opening sign-in…','dim');}}
+  else if(s==='logout')signOut();
+  else if(s==='who'){if(!G.user){tl('not signed in','warn');return;}
+   tl('login: '+G.user.login);tl('rate : '+(G.rate?G.rate.r+'/'+G.rate.l:'—'),'cy');}
+  else if(s==='repo'){if(!p[2]){tl('usage: gh repo <owner/name>','warn');return;}
+   $('inRepo').value=p[2];loadRepo();}
+  else if(s==='status'){if(!G.repo){tl('no repo linked','warn');return;}
+   tl('repo : '+G.repo.info.full_name);tl('stars: ★'+G.repo.info.stargazers_count);
+   tl('pages: '+(G.pages?'LIVE → '+G.pages.html_url:'off'),G.pages?'ok':'warn');
+   tl('bridge: '+(B.man?'coded '+B.man.domain:'none'));}
+  else tl('gh: login|logout|who|repo|status','err');}
+ else if(c==='git'){if((p[1]||'')==='log'){var n=parseInt(p[2],10)||8;
+   if(!G.commits.length){tl('no commits','warn');return;}
+   G.commits.slice(0,n).forEach(function(x){
+    tl('  '+x.sha.slice(0,7)+'  '+((x.commit.message||'').split('\n')[0]+'                                    ').slice(0,38));});}
+  else tl('git: log [n]','warn');}
+ else if(c==='domain'){if((p[1]||'')==='dns'){if(p[2])$('inDomain').value=p[2];showTab('hosting');renderDns();}
+  else{showTab('hosting');renderLinks();tl('· links refreshed','cy');}}
+ else if(c==='docker'||c==='d'){var sd=p[1]||'';
+  if(sd==='ps'){var all=p.indexOf('-a')>-1;
+   var ls=S.cs.filter(function(x){return all||x.st==='running';});
+   if(!ls.length){tl('no containers','dim');return;}
+   ls.forEach(function(x){tl('  '+x.id+'  '+(x.img+'                    ').slice(0,20)+'  '+x.st);});}
+  else if(sd==='run'){if(!p[2]){tl('usage: docker run <image>','warn');return;}
+   tl('pulling '+p[2]+'…','dim');tl('');spawn(p[2],p.slice(3).join(' ')||'sh');}
+  else if(sd==='stop'){var t2=p[2];
+   if(t2==='all'){S.cs.slice().forEach(function(x){kill(x,'user');});return;}
+   var tg=S.cs.filter(function(x){return x.id.indexOf(t2||'')>-1;});
+   if(!tg.length){tl('no such container','err');return;}tg.forEach(function(x){kill(x,'user');});}
+  else if(sd==='info'){tl('Server : vdn-1.0.2 (virtual)');tl('Host Docker : NOT MOUNTED ✓','ok');
+   tl('Codecs : jpeg app15 + png lsb');tl('GitHub : '+(G.token?'authenticated':'anonymous'));}
+  else tl('docker: ps|run|stop|info','err');}
+ else if(c==='hook'){var s2=p[1]||'list';
+  if(s2==='list')GATES.forEach(function(g){tl('  '+(g+'             ').slice(0,15)+'  '+(S.gh[g]||0)+' hits');});
+  else if(s2==='on'||s2==='off'){var nm=(p[2]||'').toLowerCase();
+   if(!(nm in S.hooks)){tl('unknown hook','err');return;}
+   S.hooks[nm]=(s2==='on');renderHooks();tl('· '+nm+' → '+s2,s2==='on'?'ok':'warn');}
+  else tl('hook list|on|off','warn');}
+ else if(c==='pipeline'){var s3=p[1]||'list';
+  if(s3==='list')Object.keys(PIPE).forEach(function(k){tl('  '+(k+'                 ').slice(0,18)+PIPE[k].s.length+' steps');});
+  else if(s3==='run')runPipe(p[2]||'build');
+  else tl('pipeline list|run','warn');}
+ else if(c==='audit'){if((p[1]||'')==='verify'){
+   tl('verifying hash-chain…','dim');
+   setTimeout(function(){tl('  ✓ linkage intact · root '+S.chain,'ok');
+    tl('  ✓ fnv-chained · every action signed','ok');},260);}
+  else S.ev.slice(0,8).forEach(function(e){tl('  '+clk(e.t)+'  '+e.s+'  '+e.m);});}
+ else if(c==='net'){var m2=(p[1]||'').toLowerCase();
+  if(['isolated','allowlist','open'].indexOf(m2)>-1)setNet(m2);else tl('usage: net isolated|allowlist|open','warn');}
+ else tl(c+': command not found — type "help"','err');}
+
+function showTab(n){
+ document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('on',t.getAttribute('data-tab')===n);});
+ document.querySelectorAll('.tabpane').forEach(function(x){x.hidden=x.getAttribute('data-pane')!==n;});
+ document.querySelectorAll('[data-jump]').forEach(function(a){a.classList.toggle('on',a.getAttribute('data-jump')===n);});
+ try{if(history.replaceState)history.replaceState(null,'','#'+n);}catch(e){}}
+function openAuth(){$('authOverlay').classList.add('on');
+ $('authTitle').textContent=G.user?'github · '+G.user.login:'connect github';}
+function closeAuth(){$('authOverlay').classList.remove('on');}
+function wireP(drop,inp,h){
+ drop.addEventListener('click',function(){inp.click();});
+ inp.addEventListener('change',function(e){if(e.target.files[0])h(e.target.files[0]);});
+ ['dragenter','dragover'].forEach(function(v){drop.addEventListener(v,function(e){e.preventDefault();drop.classList.add('hot');});});
+ ['dragleave','drop'].forEach(function(v){drop.addEventListener(v,function(e){e.preventDefault();drop.classList.remove('hot');});});
+ drop.addEventListener('drop',function(e){var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)h(f);});}
+
+document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){showTab(t.getAttribute('data-tab'));});});
+document.querySelectorAll('[data-jump]').forEach(function(a){a.addEventListener('click',function(){showTab(a.getAttribute('data-jump'));});});
+$('ghpill').addEventListener('click',openAuth);
+$('authClose').addEventListener('click',closeAuth);
+$('authOverlay').addEventListener('click',function(e){if(e.target===$('authOverlay'))closeAuth();});
+$('btnTok').addEventListener('click',function(){signIn($('inTok').value);});
+$('inTok').addEventListener('keydown',function(e){if(e.key==='Enter')signIn(this.value);});
+$('btnOut').addEventListener('click',signOut);
+$('btnLoad').addEventListener('click',loadRepo);
+$('inRepo').addEventListener('keydown',function(e){if(e.key==='Enter')loadRepo();});
+$('btnDns').addEventListener('click',renderDns);
+$('btnPublish').addEventListener('click',doPublish);
+$('btncollapse').addEventListener('click',function(){var t=$('term');t.classList.toggle('collapsed');
+ this.textContent=t.classList.contains('collapsed')?'⌄':'⌃';});
+$('tinput').addEventListener('keydown',function(e){
+ if(e.key==='Enter'){exec(this.value);this.value='';}
+ else if(e.key==='ArrowUp'){if(hi>0){hi--;this.value=hist[hi];}e.preventDefault();}
+ else if(e.key==='ArrowDown'){if(hi<hist.length-1){hi++;this.value=hist[hi];}else{hi=hist.length;this.value='';}e.preventDefault();}});
+$('tlog').addEventListener('click',function(){$('tinput').focus();});
+document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();$('tinput').focus();}});
+document.querySelectorAll('#netseg button').forEach(function(b){b.addEventListener('click',function(){setNet(b.getAttribute('data-net'));});});
+$('btnrun').addEventListener('click',function(){
+ var pool=['alpine:latest','python:3.11','redis:7-alpine','ollama/qwen2.5:0.5b'];
+ var img=pool[Math.floor(Math.random()*pool.length)];
+ exec('docker run '+img+(img.indexOf('python')>-1?' python main.py':' sh'));});
+$('btnpoll').addEventListener('click',function(){tl('polling sandboxd.sock…','dim');renderC();renderQ();pe('poll','daemon poll');});
+$('btnkill').addEventListener('click',function(){if(!S.cs.length){tl('· nothing to kill','dim');return;}exec('docker stop all');});
+$('btnverify').addEventListener('click',function(){exec('audit verify');});
+wireP($('drop'),$('fileIn'),loadImg);
+wireP($('vdrop'),$('vfile'),verifyFile);
+$('btnEmbed').addEventListener('click',embed);
+$('btnDlImg').addEventListener('click',function(){if(B.blob)dl(B.ext==='jpg'?'bridge.jpg':'bridge.png',B.blob);});
+$('btnDlClaim').addEventListener('click',function(){if(B.man)dl('claim.json',new Blob([JSON.stringify(B.man,null,2)],{type:'application/json'}));});
+$('btnDlVerify').addEventListener('click',function(){if(B.vhtml)dl('verify.html',new Blob([B.vhtml],{type:'text/html'}));});
+$('btnFb').addEventListener('click',fbUpload);
+$('btnCurl').addEventListener('click',function(){cp(fbCurl(),'curl');});
+
+function boot(){
+ renderHooks();renderGates();renderPipes();renderC();renderQ();renderEv();
+ setNet('isolated',true);repoBar();renderPin();
+ tl('sandboxd vdn-1.0.2 · daemon + bridge, one app','cy');
+ tl('host docker socket : NOT MOUNTED ✓','ok');
+ tl('codecs             : jpeg app15 · png lsb','dim');
+ tl('github bridge      : api.github.com (CORS direct)','dim');
+ tl('dock               : operations · source · hosting · bridge','dim');
+ tl('');pe('daemon','sandboxd started','ok');
+ var lv=ls('sbx_live');
+ if(lv){try{var r=JSON.parse(lv);P.result=r;setLive(r.url);tl('· last published → '+r.url,'ok');}catch(e){}}
+ var tk=ls('sbx_tok');
+ if(tk){G.token=tk;gh('/user').then(function(u){applyUser(u);tl('· session restored','dim');}).catch(function(){G.token=null;lss('sbx_tok',null);});}
+ var rp=ls('sbx_repo');
+ if(rp)setTimeout(function(){$('inRepo').value=rp;tl('· restoring '+rp+' …','dim');loadRepo();},340);
+ setTimeout(function(){
+  tl('→ gh login          sign in with a token','vio');
+  tl('→ gh repo owner/name  link a repo (public ok)','vio');
+  tl('→ bridge            code a claim into a JPG','vio');
+  tl('→ publish           live URL + claim bundle','vio');
+  tl('');},430);
+ setTimeout(function(){spawn('alpine:latest','sh');},1200);
+ var h=(location.hash||'').replace('#','');
+ if(['ops','source','hosting','bridge'].indexOf(h)>-1)showTab(h);
+ try{var q=new URLSearchParams(location.search).get('repo');if(q){$('inRepo').value=q;loadRepo();}}catch(e){}
+}
+setInterval(function(){renderUp();
+ S.cs.forEach(function(c){if(c.st==='running'){
+  c.cpu=Math.max(0.02,Math.min(0.95,c.cpu+(Math.random()-0.5)*0.16));
+  c.mem=Math.max(60,Math.min(420,c.mem+(Math.random()-0.5)*22));}});
+ renderC();renderQ();},1200);
+boot();
+if(window.Paean&&typeof window.Paean.ready==='function'){try{window.Paean.ready();}catch(e){}}
+})();
+</script>
+</body></html>

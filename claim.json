@@ -1,0 +1,20 @@
+{
+  "v": "SBX1",
+  "proto": "sandboxd-bridge/1",
+  "domain": "Pages.mydomain.dev",
+  "claim": "https://Pages.mydomain.dev/claim.json",
+  "verify": "https://Pages.mydomain.dev/verify.html",
+  "sandbox": "sbx_cd2ca2",
+  "chain": "774f192a",
+  "commit": null,
+  "codec": "jpeg-app15",
+  "image": {
+    "sha256": "0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded",
+    "px": "517x526",
+    "bytes": 247834,
+    "type": "image/jpeg"
+  },
+  "issued": "2026-11-01T03:52:14.814Z",
+  "durable": "visible watermark",
+  "fragile": "app15 segment (survives file copy)"
+}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>claim · Pages.mydomain.dev</title>
+<style>
+body{background:#06080b;color:#c9d6e4;font-family:ui-monospace,Menlo,monospace;margin:0;padding:26px 18px;line-height:1.6}
+main{max-width:620px;margin:0 auto}h1{font-size:15px;letter-spacing:.08em;color:#22d3ee;margin:0 0 3px}
+.sub{font-size:10px;color:#43546a;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px}
+.b{border:1px solid #1a2431;background:#0b1017;border-radius:9px;padding:12px;margin-bottom:10px}
+.k{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:4px 0;border-bottom:1px solid #131c26}
+.k:last-child{border:0}.k span:first-child{color:#67788c}.k span:last-child{color:#cfe0ee;text-align:right;word-break:break-all}
+#st{font-size:11px;border-radius:7px;padding:10px;border:1px solid #4a3a12;background:#13100a;color:#f7cf74}
+#st.ok{border-color:#1d6b52;background:#07140f;color:#7fe3bb}#st.err{border-color:#4d1a24;background:#130a0d;color:#ff9baa}
+code{color:#67e8f9}
+</style></head><body><main>
+<h1>⬡ image claim</h1><div class="sub">sandboxd bridge · provenance</div>
+<div class="b">
+<div class="k"><span>domain</span><span>Pages.mydomain.dev</span></div>
+<div class="k"><span>codec</span><span>jpeg-app15</span></div>
+<div class="k"><span>claimed sha-256</span><span>0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded</span></div>
+<div class="k"><span>sandbox</span><span>sbx_cd2ca2</span></div>
+<div class="k"><span>chain root</span><span>774f192a</span></div>
+<div class="k"><span>issued</span><span>2026-11-01T03:52:14.814Z</span></div></div>
+<div id="st">verifying bridge.png …</div>
+<p style="font-size:10px;color:#43546a;margin-top:16px">Hashes <code>bridge.png</code> in your browser and compares it to the SHA-256 inside the image. Nothing is uploaded.</p>
+<script>
+(async function(){
+ var want="0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded";
+ var el=document.getElementById("st");
+ try{
+  var r=await fetch("bridge.png",{cache:"no-store"});
+  if(!r.ok)throw new Error("bridge.png not found ("+r.status+")");
+  var b=await r.arrayBuffer();
+  var d=await crypto.subtle.digest("SHA-256",b);
+  var got=[].map.call(new Uint8Array(d),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");
+  if(got===want){el.className="ok";el.textContent="✓ authentic — bridge.png hashes to the value inside its own payload.";}
+  else{el.className="err";el.textContent="✗ mismatch — served "+got.slice(0,24)+"… vs claimed "+want.slice(0,24)+"…";}
+ }catch(e){el.className="err";el.textContent="could not verify: "+e.message;}
+})();
+</script>
+</main></body></html>

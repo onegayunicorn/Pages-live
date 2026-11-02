@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:sandboxd:schemas:claim:1",
+  "title": "sandboxd Bridge Claim",
+  "type": "object",
+  "required": [
+    "v",
+    "proto",
+    "domain",
+    "claim",
+    "verify",
+    "sandbox",
+    "chain",
+    "commit",
+    "codec",
+    "image",
+    "issued",
+    "durable",
+    "fragile"
+  ],
+  "properties": {
+    "v": { "const": "SBX1" },
+    "proto": { "const": "sandboxd-bridge/1" },
+    "domain": { "type": "string", "minLength": 1 },
+    "claim": { "type": "string", "format": "uri" },
+    "verify": { "type": "string", "format": "uri" },
+    "sandbox": { "type": "string", "minLength": 1 },
+    "chain": { "type": "string", "minLength": 1, "maxLength": 16 },
+    "commit": { "type": ["string", "null"] },
+    "codec": { "enum": ["jpeg-app15", "png-lsb"] },
+    "image": {
+      "type": "object",
+      "required": ["sha256", "px", "bytes", "type"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "px": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "type": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "artifact": {
+      "type": "object",
+      "required": ["file", "sha256", "bytes", "type"],
+      "properties": {
+        "file": { "enum": ["bridge.jpg", "bridge.png"] },
+        "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1 },
+        "type": { "enum": ["image/jpeg", "image/png"] }
+      },
+      "additionalProperties": false
+    },
+    "issued": { "type": "string", "format": "date-time" },
+    "durable": { "type": "string" },
+    "fragile": { "type": "string" }
+  },
+  "additionalProperties": true
+}

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#06080b">
+<link rel="icon" type="image/svg+xml" href="./portal/favicon.svg"><link rel="manifest" href="./portal/site.webmanifest">
 <title>sandboxd — daemon + bridge</title>
 <style>
 :root{--bg:#06080b;--panel:#0b1017;--panel2:#0e141c;--line:#1a2431;--line2:#243244;--txt:#c9d6e4;--dim:#67788c;--dim2:#43546a;--cy:#22d3ee;--ok:#34d399;--warn:#fbbf24;--err:#fb7185;--m:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -169,10 +170,10 @@ td{padding:6px 5px;border-bottom:1px solid rgba(26,36,49,.55);font-size:11px;col
     <div class="bs">daemon · github · publish · bridge</div>
   </div></div>
   <div class="pills">
-    <span class="pill ok"><i class="dot pl"></i>DAEMON <b>RUNNING</b></span>
-    <span class="pill">uptime <b id="uptime">00:46:34</b></span>
+    <span class="pill warn"><i class="dot"></i>SIMULATION <b>DEMO ONLY</b></span>
+    <span class="pill">session <b id="uptime">00:46:34</b></span>
     <span class="pill warn">host.sock <b>UNMOUNTED</b></span>
-    <span class="pill"><i class="dot" style="color:#a78bfa"></i>chain <b id="chainroot">5c59e4da</b></span>
+    <span class="pill"><i class="dot" style="color:#a78bfa"></i>demo chain <b id="chainroot">5c59e4da</b></span>
     <a class="pill ok" id="livepill" target="_blank" rel="noopener" href="https://onegayunicorn.github.io/Pages-live/" hidden=""><i class="dot"></i>LIVE <b id="livehost">onegayunicorn.github.io</b> ↗</a>
     <button class="ghb" id="ghpill"><img src="https://avatars.githubusercontent.com/u/40648133?v=4" alt=""><span>onegayunicorn</span></button>
   </div>
@@ -185,7 +186,9 @@ td{padding:6px 5px;border-bottom:1px solid rgba(26,36,49,.55);font-size:11px;col
   <button class="tab" data-tab="bridge">Bridge</button>
 </div>
 
-<div class="tabpane" data-pane="ops" hidden=""><div class="g3">
+<div class="tabpane" data-pane="ops" hidden="">
+  <div class="wb" role="note" style="margin:0 0 10px"><b>DEMO ONLY:</b> Operations containers, quotas, network state, pipelines, lifecycle events, and audit chain are simulated in this browser. They do not run Docker. The separate authenticated Docker API is not connected to this dashboard yet.</div>
+  <div class="g3">
   <div class="col">
     <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>Quotas</div><span class="chip cy">hard</span></div><div class="bd">
       <div class="q"><div class="qr"><span>memory</span><span><b id="qmem">0</b> / <b id="qmemmax">2048</b>mb</span></div><div class="tk"><div class="fl ok" id="fmem" style="width: 0%;"></div></div></div>
@@ -261,6 +264,7 @@ td{padding:6px 5px;border-bottom:1px solid rgba(26,36,49,.55);font-size:11px;col
 <div class="tabpane" data-pane="bridge" hidden=""><div class="g2">
   <div class="col">
     <div class="panel"><div class="hd"><div class="ttl"><span class="bm"></span>1 · Code a claim</div><span class="chip ok" id="imgchip">517×526</span></div><div class="bd">
+      <div class="wb" role="note" style="margin-bottom:8px">Bridge claims are unsigned. The audit ref is user-supplied; default is <b>unavailable</b> because this tool has no live API audit connection. Hashes detect byte changes, not authorship.</div>
       <div class="drop" id="drop">
         <div class="bg">drop a JPG — or click to pick</div>
         <div class="sb">JPG → <b>APP15 segment</b> (pixels untouched) · PNG → LSB plane</div>
@@ -274,7 +278,7 @@ td{padding:6px 5px;border-bottom:1px solid rgba(26,36,49,.55);font-size:11px;col
       </div>
       <div class="row" style="margin-top:6px">
         <div class="fld" style="flex:1;min-width:100px"><label>sandbox id</label><input id="bSbx" placeholder="sbx_1a2b3c"></div>
-        <div class="fld" style="width:90px"><label>chain</label><input id="bChain" placeholder="deadbeef"></div>
+        <div class="fld" style="width:150px"><label>audit ref</label><input id="bChain" placeholder="unavailable / reference"></div>
       </div>
       <div class="row" style="margin-top:8px">
         <button class="btn cy" id="btnEmbed">⬡ code payload</button>
@@ -622,6 +626,11 @@ async function doPublish(){
    await ghS('PUT','/repos/'+owner+'/'+rn+'/contents/'+path,body);}
   var html=selfHtml();pl('run','serialising ('+Math.round(html.length/1024)+' KB)');
   await put('index.html',html,'deploy sandboxd');pl('ok','committed index.html');
+  for(var ai=0;ai<['portal/favicon.svg','portal/site.webmanifest'].length;ai++){
+   var ap=['portal/favicon.svg','portal/site.webmanifest'][ai];
+   try{var ar=await fetch(new URL('./'+ap,location.href),{cache:'no-store'});
+    if(!ar.ok)throw new Error('HTTP '+ar.status);await put(ap,await ar.text(),'portal asset');pl('ok','committed '+ap);}
+   catch(ae){pl('warn','portal asset '+ap+': '+ae.message);}}
   if(B.man){
    try{await put('claim.json',JSON.stringify(B.man,null,2),'bridge claim');
     await put('verify.html',B.vhtml||mkVerify(),'bridge verifier');
@@ -763,7 +772,7 @@ function mkMan(){
  var raw=($('bDomain').value.trim()||$('pubDomain').value.trim()||'unclaimed.local');
  var d=raw.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
  return {v:'SBX1',proto:'sandboxd-bridge/1',domain:d,claim:'https://'+d+'/claim.json',verify:'https://'+d+'/verify.html',
-  sandbox:($('bSbx').value||'sbx_'+rid()),chain:($('bChain').value||S.chain).slice(0,16),
+  sandbox:($('bSbx').value||'sbx_'+rid()),chain:($('bChain').value.trim()||'unavailable').slice(0,16),
   commit:($('bCommit').value||(G.pinned?G.pinned.sha.slice(0,7):''))||null,
   codec:B.jpg?'jpeg-app15':'png-lsb',
   image:{sha256:B.sha,px:B.w+'x'+B.h,bytes:B.file?B.file.size:0,type:B.file?B.file.type:null},
@@ -789,7 +798,7 @@ async function embed(){
   var out=jemb(base,j);
   blog('ok','APP15 spliced ('+(12+new TextEncoder().encode(j).length)+' B)');
   var blob=new Blob([out],{type:'image/jpeg'});
-  finish(blob,'jpg','bridge.jpg');
+  await finish(blob,'jpg','bridge.jpg');
   var back=jx(await blob.arrayBuffer());
   blog(back?'ok':'err',back?'round-trip verified · '+back.length+' B':'round-trip FAILED');
  }else{
@@ -801,17 +810,18 @@ async function embed(){
   if($('optMark').checked){wm(ctx,B.w,B.h,m);blog('ok','watermark burned');}
   showOut(cvp);
   var blob2=await new Promise(function(r){cvp.toBlob(r,'image/png');});
-  finish(blob2,'png','bridge.png');
+  await finish(blob2,'png','bridge.png');
   var back2=decLSB(cvp.getContext('2d').getImageData(0,0,B.w,B.h).data);
   blog(back2?'ok':'err',back2?'round-trip verified':'round-trip FAILED');}}
-function finish(blob,ext,name){B.blob=blob;B.ext=ext;
+async function finish(blob,ext,name){B.blob=blob;B.ext=ext;
+ B.man.artifact={file:name,sha256:await sha(await blob.arrayBuffer()),bytes:blob.size,type:blob.type};
  $('outchip').textContent='coded · '+ext.toUpperCase();$('outchip').className='chip ok';
  $('outactions').hidden=false;$('btnDlImg').textContent='↓ '+name;
  $('bchip').textContent='ready';$('bchip').className='chip ok';
  $('btnDlClaim').disabled=false;$('btnDlVerify').disabled=false;$('btnFb').disabled=false;
  $('claimpre').textContent=JSON.stringify(B.man,null,2);
  mkVerify();renderLinks();
- blog('info','output '+name+' · '+(blob.size/1024).toFixed(1)+' KB');
+ blog('info','output '+name+' · '+(blob.size/1024).toFixed(1)+' KB · artifact sha256 '+B.man.artifact.sha256.slice(0,12)+'…');
  pe('bridge','coded → '+B.man.domain+' ('+ext.toUpperCase()+')','ok');
  tl('✓ claim coded into '+name+' → '+B.man.domain,'ok');}
 async function verifyFile(file){
@@ -830,20 +840,24 @@ async function verifyFile(file){
   blog('warn','verify: no payload');return;}
  var m=null;try{m=JSON.parse(raw);}catch(e){}
  if(!m){$('vchip').textContent='corrupt';$('vchip').className='chip err';return;}
- var same=m.image&&m.image.sha256===fs;
- $('vchip').textContent=same?'authentic':'payload ok';$('vchip').className='chip '+(same?'ok':'warn');
+ var local=B.man&&B.man.artifact&&B.man.domain===m.domain&&m.image&&B.man.image&&B.man.image.sha256===m.image.sha256?B.man.artifact:null;
+ var same=!!(local&&local.sha256===fs);
+ $('vchip').textContent=same?'byte match':'payload decoded';$('vchip').className='chip '+(same?'ok':'warn');
  $('vout').innerHTML='<div class="'+(same?'ob':'wb')+'">'+(same
-  ?'✓ Decoded via <b>'+codec+'</b> · hash matches — byte-identical to the signed original.'
-  :'⚠ Decoded via <b>'+codec+'</b> · hash differs — re-saved after coding.')+'</div>'+
+  ?'✓ Decoded via <b>'+codec+'</b> · file SHA-256 matches the coded artifact in this session.'
+  :'⚠ Payload decoded via <b>'+codec+'</b>. The embedded source hash is not the encoded-file hash; use the domain verifier to check published artifact bytes.')+'</div>'+
   '<div class="kv" style="margin-top:7px"><span>domain</span><span>'+esc(m.domain)+'</span></div>'+
   '<div class="kv"><span>claim</span><span>'+esc(m.claim||'—')+'</span></div>'+
-  '<div class="kv"><span>claimed sha</span><span>'+esc((m.image&&m.image.sha256||'').slice(0,16))+'…</span></div>'+
+  '<div class="kv"><span>source sha</span><span>'+esc((m.image&&m.image.sha256||'').slice(0,16))+'…</span></div>'+
   '<div class="kv"><span>this file sha</span><span>'+esc(fs.slice(0,16))+'…</span></div>'+
+  (local?'<div class="kv"><span>expected artifact sha</span><span>'+esc(local.sha256.slice(0,16))+'…</span></div>':'')+
   '<div class="kv"><span>sandbox · chain</span><span>'+esc(m.sandbox||'—')+' · '+esc(m.chain||'—')+'</span></div>';
- blog('ok','verify: '+codec+' → '+m.domain);}
+ blog(same?'ok':'warn','verify: '+codec+' → '+m.domain);}
 function mkVerify(){
- var m=B.man;if(!m)return'';var fn=(B.ext==='jpg'?'bridge.jpg':'bridge.png');
- var h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>\n<title>claim · '+m.domain+'</title>\n<style>\n'+
+ var m=B.man;if(!m)return'';
+ var fn=(m.artifact&&m.artifact.file)||(B.ext==='jpg'?'bridge.jpg':'bridge.png');
+ var want=(m.artifact&&m.artifact.sha256)||'';
+ var h='<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>\n<title>claim · '+esc(m.domain)+'</title>\n<style>\n'+
  'body{background:#06080b;color:#c9d6e4;font-family:ui-monospace,Menlo,monospace;margin:0;padding:26px 18px;line-height:1.6}\n'+
  'main{max-width:620px;margin:0 auto}h1{font-size:15px;letter-spacing:.08em;color:#22d3ee;margin:0 0 3px}\n'+
  '.sub{font-size:10px;color:#43546a;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px}\n'+
@@ -855,18 +869,22 @@ function mkVerify(){
  'code{color:#67e8f9}\n</style></head><body><main>\n<h1>⬡ image claim</h1><div class="sub">sandboxd bridge · provenance</div>\n<div class="b">\n'+
  '<div class="k"><span>domain</span><span>'+esc(m.domain)+'</span></div>\n'+
  '<div class="k"><span>codec</span><span>'+esc(m.codec)+'</span></div>\n'+
- '<div class="k"><span>claimed sha-256</span><span>'+esc(m.image.sha256)+'</span></div>\n'+
+ '<div class="k"><span>source sha-256</span><span>'+esc(m.image.sha256)+'</span></div>\n'+
+ '<div class="k"><span>artifact file</span><span>'+esc(fn)+'</span></div>\n'+
+ '<div class="k"><span>artifact sha-256</span><span>'+esc(want||'not recorded')+'</span></div>\n'+
  '<div class="k"><span>sandbox</span><span>'+esc(m.sandbox)+'</span></div>\n'+
  '<div class="k"><span>chain root</span><span>'+esc(m.chain)+'</span></div>\n'+
  (m.commit?'<div class="k"><span>commit</span><span>'+esc(m.commit)+'</span></div>\n':'')+
  '<div class="k"><span>issued</span><span>'+esc(m.issued)+'</span></div></div>\n'+
- '<div id="st">verifying '+fn+' …</div>\n<p style="font-size:10px;color:#43546a;margin-top:16px">Hashes <code>'+fn+'</code> in your browser and compares it to the SHA-256 inside the image. Nothing is uploaded.</p>\n'+
- '<script>\n(async function(){\n var want="'+m.image.sha256+'";\n var el=document.getElementById("st");\n try{\n'+
- '  var r=await fetch("'+fn+'",{cache:"no-store"});\n  if(!r.ok)throw new Error("'+fn+' not found ("+r.status+")");\n'+
+ '<div id="st">verifying '+esc(fn)+' …</div>\n<p style="font-size:10px;color:#43546a;margin-top:16px">Checks the encoded file against the artifact SHA-256 in claim.json. The source-image digest is different because coding changes the file. Hash matching is integrity checking, not a digital signature. Nothing is uploaded.</p>\n'+
+ '<script>\n(async function(){\n var file='+JSON.stringify(fn)+';\n var want='+JSON.stringify(want)+';\n var el=document.getElementById("st");\n try{\n'+
+ '  if(!want)throw new Error("claim.json has no artifact.sha256; re-code and publish the image bundle.");\n'+
+ '  if(file!=="bridge.jpg"&&file!=="bridge.png")throw new Error("unsupported artifact filename");\n'+
+ '  var r=await fetch(file,{cache:"no-store"});\n  if(!r.ok)throw new Error(file+" not found ("+r.status+")");\n'+
  '  var b=await r.arrayBuffer();\n  var d=await crypto.subtle.digest("SHA-256",b);\n'+
  '  var got=[].map.call(new Uint8Array(d),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");\n'+
- '  if(got===want){el.className="ok";el.textContent="✓ authentic — '+fn+' hashes to the value inside its own payload.";}\n'+
- '  else{el.className="err";el.textContent="✗ mismatch — served "+got.slice(0,24)+"… vs claimed "+want.slice(0,24)+"…";}\n'+
+ '  if(got===want){el.className="ok";el.textContent="✓ byte match — "+file+" matches the artifact SHA-256 in claim.json.";}\n'+
+ '  else{el.className="err";el.textContent="✗ mismatch — served "+got.slice(0,24)+"… vs manifest "+want.slice(0,24)+"…";}\n'+
  ' }catch(e){el.className="err";el.textContent="could not verify: "+e.message;}\n})();\n<\/script>\n</main></body></html>';
  B.vhtml=h;return h;}
 function fbCurl(){
@@ -908,11 +926,11 @@ async function exec(raw){
  if(c==='help'){help();}
  else if(c==='clear'){TL.innerHTML='';}
  else if(c==='status'){var u=used();
-  tl('daemon : vdn-1.0.2 RUNNING','ok');
+  tl('demo   : browser-only simulation (no Docker connection)','warn');
   tl('github : '+(G.user?G.user.login+(G.repo?' → '+G.repo.o+'/'+G.repo.n:''):'not signed in'));
   tl('live   : '+(P.result?P.result.url:'not published'));
   tl('bridge : '+(B.man?B.man.domain+' ('+B.ext.toUpperCase()+')':'no claim coded'));
-  tl('container: '+S.cs.length+' · '+u.run+' running');tl('audit  : root '+S.chain,'cy');}
+  tl('container: '+S.cs.length+' · '+u.run+' simulated');tl('audit  : demo FNV-1a reference (not cryptographic)','warn');}
  else if(c==='bridge'){showTab('bridge');
   if(!B.man)tl('bridge : no claim coded — drop a JPG in this tab','warn');
   else{tl('domain : '+B.man.domain,'ok');tl('codec  : '+B.man.codec);
@@ -950,7 +968,7 @@ async function exec(raw){
    if(!ls.length){tl('no containers','dim');return;}
    ls.forEach(function(x){tl('  '+x.id+'  '+(x.img+'                    ').slice(0,20)+'  '+x.st);});}
   else if(sd==='run'){if(!p[2]){tl('usage: docker run <image>','warn');return;}
-   tl('pulling '+p[2]+'…','dim');tl('');spawn(p[2],p.slice(3).join(' ')||'sh');}
+   tl('simulating local demo for '+p[2]+' (no pull or Docker call)…','dim');tl('');spawn(p[2],p.slice(3).join(' ')||'sh');}
   else if(sd==='stop'){var t2=p[2];
    if(t2==='all'){S.cs.slice().forEach(function(x){kill(x,'user');});return;}
    var tg=S.cs.filter(function(x){return x.id.indexOf(t2||'')>-1;});
@@ -969,9 +987,9 @@ async function exec(raw){
   else if(s3==='run')runPipe(p[2]||'build');
   else tl('pipeline list|run','warn');}
  else if(c==='audit'){if((p[1]||'')==='verify'){
-   tl('verifying hash-chain…','dim');
-   setTimeout(function(){tl('  ✓ linkage intact · root '+S.chain,'ok');
-    tl('  ✓ fnv-chained · every action signed','ok');},260);}
+   tl('verifying demo link sequence…','dim');
+   setTimeout(function(){tl('  ✓ demo linkage sequence present · root '+S.chain,'ok');
+    tl('  ! FNV-1a demo only · not a cryptographic signature or audit proof','warn');},260);}
   else S.ev.slice(0,8).forEach(function(e){tl('  '+clk(e.t)+'  '+e.s+'  '+e.m);});}
  else if(c==='net'){var m2=(p[1]||'').toLowerCase();
   if(['isolated','allowlist','open'].indexOf(m2)>-1)setNet(m2);else tl('usage: net isolated|allowlist|open','warn');}

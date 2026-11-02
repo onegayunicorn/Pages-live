@@ -1,0 +1,18 @@
+{
+  "name": "sandboxd — daemon + bridge",
+  "short_name": "sandboxd",
+  "description": "Sandbox control-plane demo and provenance bridge portal.",
+  "start_url": "../",
+  "scope": "../",
+  "display": "standalone",
+  "background_color": "#06080b",
+  "theme_color": "#06080b",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

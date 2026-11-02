@@ -1,40 +1,76 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>claim · Pages.mydomain.dev</title>
-<style>
-body{background:#06080b;color:#c9d6e4;font-family:ui-monospace,Menlo,monospace;margin:0;padding:26px 18px;line-height:1.6}
-main{max-width:620px;margin:0 auto}h1{font-size:15px;letter-spacing:.08em;color:#22d3ee;margin:0 0 3px}
-.sub{font-size:10px;color:#43546a;letter-spacing:.12em;text-transform:uppercase;margin-bottom:18px}
-.b{border:1px solid #1a2431;background:#0b1017;border-radius:9px;padding:12px;margin-bottom:10px}
-.k{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:4px 0;border-bottom:1px solid #131c26}
-.k:last-child{border:0}.k span:first-child{color:#67788c}.k span:last-child{color:#cfe0ee;text-align:right;word-break:break-all}
-#st{font-size:11px;border-radius:7px;padding:10px;border:1px solid #4a3a12;background:#13100a;color:#f7cf74}
-#st.ok{border-color:#1d6b52;background:#07140f;color:#7fe3bb}#st.err{border-color:#4d1a24;background:#130a0d;color:#ff9baa}
-code{color:#67e8f9}
-</style></head><body><main>
-<h1>⬡ image claim</h1><div class="sub">sandboxd bridge · provenance</div>
-<div class="b">
-<div class="k"><span>domain</span><span>Pages.mydomain.dev</span></div>
-<div class="k"><span>codec</span><span>jpeg-app15</span></div>
-<div class="k"><span>claimed sha-256</span><span>0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded</span></div>
-<div class="k"><span>sandbox</span><span>sbx_cd2ca2</span></div>
-<div class="k"><span>chain root</span><span>774f192a</span></div>
-<div class="k"><span>issued</span><span>2026-11-01T03:52:14.814Z</span></div></div>
-<div id="st">verifying bridge.png …</div>
-<p style="font-size:10px;color:#43546a;margin-top:16px">Hashes <code>bridge.png</code> in your browser and compares it to the SHA-256 inside the image. Nothing is uploaded.</p>
-<script>
-(async function(){
- var want="0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded";
- var el=document.getElementById("st");
- try{
-  var r=await fetch("bridge.png",{cache:"no-store"});
-  if(!r.ok)throw new Error("bridge.png not found ("+r.status+")");
-  var b=await r.arrayBuffer();
-  var d=await crypto.subtle.digest("SHA-256",b);
-  var got=[].map.call(new Uint8Array(d),function(x){return ("0"+x.toString(16)).slice(-2);}).join("");
-  if(got===want){el.className="ok";el.textContent="✓ authentic — bridge.png hashes to the value inside its own payload.";}
-  else{el.className="err";el.textContent="✗ mismatch — served "+got.slice(0,24)+"… vs claimed "+want.slice(0,24)+"…";}
- }catch(e){el.className="err";el.textContent="could not verify: "+e.message;}
-})();
-</script>
-</main></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#06080b" />
+  <title>Image claim verifier · sandboxd</title>
+  <style>
+    :root{color-scheme:dark;--bg:#06080b;--panel:#0b1017;--line:#1a2431;--txt:#c9d6e4;--dim:#67788c;--cyan:#22d3ee;--ok:#7fe3bb;--warn:#f7cf74;--err:#ff9baa}
+    *{box-sizing:border-box}body{margin:0;padding:26px 18px;background:var(--bg);color:var(--txt);font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    main{max-width:680px;margin:0 auto}h1{font-size:16px;color:var(--cyan);margin:0}.sub{font-size:10px;color:#43546a;letter-spacing:.12em;text-transform:uppercase;margin:2px 0 18px}
+    .card{border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:12px;margin:0 0 10px}.row{display:flex;justify-content:space-between;gap:14px;padding:5px 0;border-bottom:1px solid #131c26;font-size:11px}.row:last-child{border:0}.row span:first-child{color:var(--dim)}.row span:last-child{text-align:right;word-break:break-all}
+    #status{border:1px solid #4a3a12;background:#13100a;color:var(--warn);border-radius:7px;padding:10px;font-size:11px}#status.ok{border-color:#1d6b52;background:#07140f;color:var(--ok)}#status.err{border-color:#4d1a24;background:#130a0d;color:var(--err)}
+    .note{font-size:10px;color:#607286;margin-top:15px}code{color:#67e8f9}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>⬡ Image claim</h1>
+    <div class="sub">sandboxd bridge · provenance</div>
+    <section class="card" aria-label="Claim details">
+      <div class="row"><span>domain</span><span id="domain">—</span></div>
+      <div class="row"><span>codec</span><span id="codec">—</span></div>
+      <div class="row"><span>source image SHA-256</span><span id="sourceSha">—</span></div>
+      <div class="row"><span>artifact file</span><span id="artifactFile">—</span></div>
+      <div class="row"><span>artifact SHA-256</span><span id="artifactSha">—</span></div>
+      <div class="row"><span>sandbox · chain</span><span id="chain">—</span></div>
+      <div class="row"><span>issued</span><span id="issued">—</span></div>
+    </section>
+    <div id="status" role="status" aria-live="polite">Loading claim.json…</div>
+    <p class="note">The source-image hash and encoded-artifact hash are different: embedding the claim changes the file. This page compares delivered bytes to <code>artifact.sha256</code> in <code>claim.json</code>. A byte match is an integrity check, not a digital signature or proof of authorship. The check runs in your browser; no image is uploaded.</p>
+  </main>
+  <script>
+    (async function () {
+      const byId = (id) => document.getElementById(id);
+      const status = byId('status');
+      const setStatus = (kind, text) => { status.className = kind; status.textContent = text; };
+      try {
+        const claimResponse = await fetch('./claim.json', { cache: 'no-store' });
+        if (!claimResponse.ok) throw new Error(`claim.json not found (${claimResponse.status})`);
+        const claim = await claimResponse.json();
+        const image = claim.image || {};
+        const artifact = claim.artifact || {};
+        const file = artifact.file || (claim.codec === 'jpeg-app15' ? 'bridge.jpg' : 'bridge.png');
+
+        byId('domain').textContent = claim.domain || '—';
+        byId('codec').textContent = claim.codec || '—';
+        byId('sourceSha').textContent = image.sha256 || '—';
+        byId('artifactFile').textContent = file;
+        byId('artifactSha').textContent = artifact.sha256 || 'not recorded';
+        byId('chain').textContent = `${claim.sandbox || '—'} · ${claim.chain || '—'}`;
+        byId('issued').textContent = claim.issued || '—';
+
+        if (file !== 'bridge.jpg' && file !== 'bridge.png') throw new Error('unsupported artifact filename');
+        if (!/^[a-f0-9]{64}$/i.test(artifact.sha256 || '')) {
+          setStatus('err', 'Cannot verify this legacy claim: claim.json has no artifact.sha256. Re-code and publish the image bundle.');
+          return;
+        }
+
+        const imageResponse = await fetch(`./${file}`, { cache: 'no-store' });
+        if (!imageResponse.ok) throw new Error(`${file} not found (${imageResponse.status})`);
+        const bytes = await imageResponse.arrayBuffer();
+        const digest = await crypto.subtle.digest('SHA-256', bytes);
+        const actual = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+        if (actual === artifact.sha256.toLowerCase()) {
+          setStatus('ok', `✓ Byte match — ${file} matches the artifact SHA-256 in claim.json.`);
+        } else {
+          setStatus('err', `✗ Mismatch — served ${actual.slice(0, 24)}… vs manifest ${artifact.sha256.slice(0, 24)}…`);
+        }
+      } catch (error) {
+        setStatus('err', `Could not verify: ${error.message}`);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+# Replace with a domain you control. Caddy provides HTTPS and proxies only to
+# the API bound on loopback; keep the Compose port mapping loopback-only.
+sandbox-api.example.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:8787
+}

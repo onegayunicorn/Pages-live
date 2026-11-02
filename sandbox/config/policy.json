@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "mode": "docker",
+  "allowlistedImages": [
+    "alpine:latest",
+    "python:3.11",
+    "ollama/qwen2.5:0.5b",
+    "redis:7-alpine",
+    "node:20-alpine"
+  ],
+  "quotas": {
+    "memoryMb": 2048,
+    "cpuCores": 2,
+    "diskMb": 5120,
+    "pids": 256
+  },
+  "containerLimits": {
+    "memoryMb": 512,
+    "cpuCores": 0.5,
+    "pids": 128,
+    "executionSeconds": 15,
+    "maxOutputBytes": 1048576
+  },
+  "network": {
+    "default": "isolated",
+    "modes": ["isolated"]
+  },
+  "hooks": {
+    "security": true,
+    "network": true,
+    "resource": true,
+    "audit": true
+  },
+  "limits": {
+    "maxContainers": 16,
+    "maxRequestBytes": 16384,
+    "maxImageLength": 160,
+    "maxCommandLength": 2048,
+    "maxAuditEvents": 1000,
+    "maxConcurrentPipelines": 1,
+    "maxPipelineSeconds": 120
+  },
+  "pipeline": {
+    "image": "node:20-alpine",
+    "testCommand": "npm test && node scripts/check-static.mjs",
+    "buildCommand": "npm test && node scripts/check-static.mjs && PAGES_OUT_DIR=/tmp/pages-build npm run build"
+  }
+}

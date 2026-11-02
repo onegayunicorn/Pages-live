@@ -1,0 +1,40 @@
+services:
+  api:
+    build: .
+    image: ghcr.io/onegayunicorn/pages-live-sandboxd-api:latest
+    restart: unless-stopped
+    user: "${SANDBOX_UID:-1000}:${SANDBOX_GID:-1000}"
+    environment:
+      NODE_ENV: production
+      SANDBOX_API_HOST: 0.0.0.0
+      SANDBOX_API_PORT: 8787
+      SANDBOX_API_TOKEN: ${SANDBOX_API_TOKEN:?Set SANDBOX_API_TOKEN in .env}
+      SANDBOX_ALLOWED_ORIGINS: ${SANDBOX_ALLOWED_ORIGINS:?Set SANDBOX_ALLOWED_ORIGINS in .env}
+      SANDBOX_WORKSPACE_HOST_PATH: ${SANDBOX_WORKSPACE_HOST_PATH:?Set an absolute workspace path in .env}
+      SANDBOX_AUDIT_FILE: /data/audit.jsonl
+      DOCKER_SOCKET: /run/docker.sock
+    volumes:
+      - type: bind
+        source: ${DOCKER_SOCKET_PATH:?Set the dedicated rootless Docker socket in .env}
+        target: /run/docker.sock
+      - type: bind
+        source: ${SANDBOX_WORKSPACE_HOST_PATH:?Set the host workspace path in .env}
+        target: ${SANDBOX_WORKSPACE_HOST_PATH:?Set the host workspace path in .env}
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./sandbox/data
+        target: /data
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1.0

@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: sandboxd Docker API
+  version: 1.0.0
+  description: >-
+    Authenticated Docker Engine control plane for a dedicated rootless daemon.
+    Operations are limited by server policy; commands run only in managed
+    containers. GitHub Pages does not host this API.
+servers:
+  - url: https://sandbox-api.example.com
+    description: Self-hosted API behind a TLS reverse proxy
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/health:
+    get:
+      security: []
+      summary: Check API and rootless Docker availability
+      responses:
+        '200':
+          description: Docker Engine is reachable and rootless
+        '503':
+          description: Docker Engine is unavailable or not rootless
+  /api/v1/status:
+    get:
+      summary: Read actual daemon, resource usage, quotas, and audit root
+      responses:
+        '200':
+          description: Live status from the Docker Engine and API process
+        '401':
+          description: Missing or invalid bearer token
+  /api/v1/policy:
+    get:
+      summary: Read the server-enforced allowlist and resource policy
+      responses:
+        '200':
+          description: Active server policy
+        '401':
+          description: Missing or invalid bearer token
+  /api/v1/containers:
+    get:
+      summary: List sandboxd-managed Docker containers
+      responses:
+        '200':
+          description: Current Docker container state and sampled resource usage
+    post:
+      summary: Create and start a constrained Docker container
+      description: >-
+        Image must be an exact server allowlist entry and already present on the
+        rootless daemon. The optional command is executed with docker exec inside
+        the started container; it is never run by the API host.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [image]
+              additionalProperties: false
+              properties:
+                image:
+                  type: string
+                command:
+                  type: string
+                  maxLength: 2048
+      responses:
+        '201':
+          description: Container created and started
+        '400':
+          description: Invalid command or request body
+        '403':
+          description: Image is not allowlisted
+        '409':
+          description: Image has not been pre-pulled
+        '429':
+          description: Container or aggregate resource quota reached
+  /api/v1/containers/stop-all:
+    post:
+      summary: Stop all running sandboxd-managed containers
+      responses:
+        '200':
+          description: IDs of containers stopped
+  /api/v1/containers/{containerId}/exec:
+    post:
+      summary: Execute a bounded shell command inside a running managed container
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{12,64}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              additionalProperties: false
+              properties:
+                command:
+                  type: string
+                  minLength: 1
+                  maxLength: 2048
+      responses:
+        '200':
+          description: Command stdout, stderr, exit code, and runtime status
+        '401':
+          description: Missing or invalid bearer token
+        '404':
+          description: Container is not managed by sandboxd
+        '409':
+          description: Container is not running
+        '504':
+          description: Docker execution timed out
+  /api/v1/containers/{containerId}/stop:
+    post:
+      summary: Stop a managed container
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{12,64}$'
+      responses:
+        '200':
+          description: Container stopped
+        '404':
+          description: Container is not managed by sandboxd
+  /api/v1/containers/{containerId}:
+    delete:
+      summary: Stop and remove a managed container
+      parameters:
+        - name: containerId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-fA-F0-9]{12,64}$'
+      responses:
+        '200':
+          description: Container removed
+        '404':
+          description: Container is not managed by sandboxd
+  /api/v1/pipelines:
+    get:
+      summary: List fixed build/test jobs and their runtime readiness
+      responses:
+        '200':
+          description: Pipeline definitions, image/workspace availability, and reasons
+  /api/v1/pipelines/{name}/run:
+    post:
+      summary: Run an isolated fixed build or test job
+      description: >-
+        The API accepts only build or test. Jobs run in a pre-pulled Node image,
+        with network disabled, hard resource limits, a read-only workspace bind,
+        and an execution timeout. At most one pipeline can run concurrently.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [build, test]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: Job state, exit code, bounded stdout/stderr, and duration
+        '409':
+          description: Pipeline image is not pre-pulled
+        '429':
+          description: Concurrent pipeline or resource quota reached
+  /api/v1/events:
+    get:
+      summary: Read recent durable hash-chained audit events
+      responses:
+        '200':
+          description: Recent events and current chain root
+  /api/v1/audit/verify:
+    post:
+      summary: Verify the durable audit log chain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+      responses:
+        '200':
+          description: Audit chain is valid
+        '409':
+          description: Audit chain is invalid
+  /api/v1/network:
+    get:
+      summary: Read enforced isolated network policy
+      responses:
+        '200':
+          description: Workload network is fixed to Docker NetworkMode none
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque token

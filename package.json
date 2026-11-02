@@ -1,0 +1,16 @@
+{
+  "name": "pages-live-sandboxd",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node sandbox/server.mjs",
+    "bridge:build": "node scripts/build-bridge.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build-pages.mjs",
+    "check": "npm test && node scripts/check-static.mjs && npm run build"
+  }
+}

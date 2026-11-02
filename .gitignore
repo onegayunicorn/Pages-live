@@ -1,0 +1,14 @@
+# Local development
+node_modules/
+dist/
+sandbox/data/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# Local credentials
+*.token
+*.pem

@@ -1,20 +1,26 @@
 {
   "v": "SBX1",
   "proto": "sandboxd-bridge/1",
-  "domain": "Pages.mydomain.dev",
-  "claim": "https://Pages.mydomain.dev/claim.json",
-  "verify": "https://Pages.mydomain.dev/verify.html",
-  "sandbox": "sbx_cd2ca2",
-  "chain": "774f192a",
+  "domain": "onegayunicorn.github.io/Pages-live",
+  "claim": "https://onegayunicorn.github.io/Pages-live/claim.json",
+  "verify": "https://onegayunicorn.github.io/Pages-live/verify.html",
+  "sandbox": "sbx_581b4b",
+  "chain": "unavailable",
   "commit": null,
   "codec": "jpeg-app15",
   "image": {
-    "sha256": "0c9a58394598b47eb1e13a101802e0f2600fa0d26f563a3935e3c868aa966ded",
-    "px": "517x526",
-    "bytes": 247834,
+    "sha256": "fa43f9ae5e71bf34c562c5721d3ef17af170f646dd7121d23afb6b74d6857c4f",
+    "px": "1024x576",
+    "bytes": 187336,
     "type": "image/jpeg"
   },
-  "issued": "2026-11-01T03:52:14.814Z",
-  "durable": "visible watermark",
-  "fragile": "app15 segment (survives file copy)"
+  "issued": "2026-11-02T09:35:48.099Z",
+  "durable": "artifact SHA-256 in claim.json",
+  "fragile": "APP15 payload (lost on image re-encoding)",
+  "artifact": {
+    "file": "bridge.jpg",
+    "sha256": "93b8c9592e4f82ff3a248504602e1635eb2d5c357a52e8c2b458921c718ba303",
+    "bytes": 187914,
+    "type": "image/jpeg"
+  }
 }

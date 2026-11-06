@@ -49,3 +49,25 @@ test('bridge claim is well-formed in either legacy or artifact-verified form', a
     assert.match(claim.artifact.sha256, /^[a-f0-9]{64}$/);
   }
 });
+
+test('compiled COPS simulator is included under /cops with four verified installer links', async () => {
+  const page = await read('cops/index.html');
+  const scriptMatch = page.match(/src="\/Pages-live\/cops\/assets\/(index-[^"]+\.js)"/);
+  assert.ok(scriptMatch, 'COPS bundle uses the Pages subpath for JavaScript');
+  assert.match(page, /href="\/Pages-live\/cops\/assets\/index-[^"]+\.css"/);
+  const script = await read(`cops/assets/${scriptMatch[1]}`);
+  assert.match(script, /\/Pages-live\/cops\/downloads\//);
+  for (const name of [
+    'COPS-linux-x64.AppImage',
+    'COPS-windows-x64.exe',
+    'COPS-mac-intel.dmg',
+    'COPS-mac-arm64.dmg'
+  ]) assert.ok(script.includes(name), `installer link for ${name} is bundled`);
+
+  const entries = (await read('cops/SHA256SUMS')).trim().split('\n');
+  assert.equal(entries.length, 4);
+  for (const entry of entries) assert.match(entry, /^[a-f0-9]{64}  COPS-[^/]+$/);
+
+  const builder = await read('scripts/build-pages.mjs');
+  assert.match(builder, /cp\(path\.join\(ROOT, 'cops'\), path\.join\(OUT, 'cops'\)/);
+});

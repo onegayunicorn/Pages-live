@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm, stat, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,7 +33,11 @@ for (const file of OPTIONAL_FILES) {
   bridgeCount += 1;
 }
 
+if (!(await exists('cops/index.html'))) throw new Error('Required COPS microsite is missing: cops/index.html');
+if (!(await exists('cops/SHA256SUMS'))) throw new Error('Required COPS installer checksum manifest is missing: cops/SHA256SUMS');
+await cp(path.join(ROOT, 'cops'), path.join(OUT, 'cops'), { recursive: true });
+
 await writeFile(path.join(OUT, '.nojekyll'), '');
 console.log(`Pages artifact built at ${OUT}`);
-console.log(`Included root portal, claim/verifier, ${PORTAL_FILES.length} portal assets${bridgeCount ? `, ${bridgeCount} bridge image(s)` : ''}.`);
+console.log(`Included root portal, claim/verifier, ${PORTAL_FILES.length} portal assets, COPS microsite${bridgeCount ? `, ${bridgeCount} bridge image(s)` : ''}.`);
 if (!bridgeCount) console.warn('No bridge.jpg/bridge.png found; the current claim cannot verify an image until one is published.');

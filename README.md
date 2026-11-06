@@ -9,6 +9,7 @@ GitHub Pages serves static files only. It cannot run the Node API, Docker, or pe
 ```text
 .
 ├── index.html                     # self-contained portal/demo UI
+├── cops/                           # compiled COPS simulator served at /cops/
 ├── bridge.jpg                     # JPEG with embedded SBX1 provenance claim
 ├── assets/bridge-source.jpg       # source artwork for the generated bridge image
 ├── claim.json                     # source + final artifact digests
@@ -68,6 +69,12 @@ See [`sandbox/README.md`](sandbox/README.md), [`docs/DEPLOYMENT.md`](docs/DEPLOY
 The Pages workflow validates and builds an explicit static allowlist, then deploys `dist/` on pushes to `main`. Enable **Settings → Pages → Build and deployment → Source → GitHub Actions**. The API image workflow can publish a container image to GHCR, but does not deploy or start the API service.
 
 The portal's Hosting tab can publish its self-contained page to another Pages repository. The checked-in verifier and bridge image form a hash-checked bundle; a matching SHA-256 confirms byte integrity, **not authorship or identity**. The image/claim is unsigned. The offline Bridge builder sets `chain` to `unavailable`; the browser Bridge tool's optional audit reference is user-supplied and is not verified against the API.
+
+## COPS simulator and installers
+
+The compiled COPS Control Lab simulator is served independently at [`/cops/`](https://onegayunicorn.github.io/Pages-live/cops/); the existing sandboxd portal remains at `/`. Only the compiled browser output is checked into this repository. The COPS source repository remains private. Four prebuilt desktop installers are published as assets in the [`cops-v3.0.0` release](https://github.com/onegayunicorn/Pages-live/releases/tag/cops-v3.0.0); the Pages workflow downloads them into `/cops/downloads/` and verifies them against `cops/SHA256SUMS` before deployment. The large installer binaries are deliberately not stored in Git history.
+
+The current installers are from a validated COPS build. The private source repository and its build logs are not mirrored here. Publishing future builds requires updating the public release assets and matching checksum manifest; this repository's Pages workflow then deploys the verified files along with the microsite.
 
 ## Current gaps
 

@@ -26,6 +26,25 @@ jobs:
           node-version: 20
       - name: Test, check, and build static artifact
         run: npm run check
+      - name: Download and verify COPS installers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/cops/downloads
+          while read -r expected filename; do
+            [[ -n "$expected" && -n "$filename" ]] || continue
+            url="https://github.com/${GITHUB_REPOSITORY}/releases/download/cops-v3.0.0/${filename}"
+            output="dist/cops/downloads/${filename}"
+            curl --fail --location --retry 3 --silent --show-error "$url" --output "$output"
+            printf '%s  %s\n' "$expected" "$output" | sha256sum --check -
+          done < cops/SHA256SUMS
+          cp cops/SHA256SUMS dist/cops/downloads/SHA256SUMS
+          site_bytes=$(du -sb dist | cut -f1)
+          if (( site_bytes > 1000000000 )); then
+            echo "Pages artifact is too large: ${site_bytes} bytes (limit: 1 GB)." >&2
+            exit 1
+          fi
+          echo "COPS downloads staged; Pages artifact size is ${site_bytes} bytes."
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact
